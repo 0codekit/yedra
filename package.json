@@ -1,0 +1,20 @@
+{
+  "name": "@wemakefuture/y",
+  "description": "A TypeScript web framework with OpenAPI generation.",
+  "author": {
+    "name": "WeMakeFuture AG"
+  },
+  "module": "index.ts",
+  "type": "module",
+  "scripts": {
+    "check": "biome check *",
+    "format": "biome format *"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "dependencies": { "@biomejs/biome": "^1.7.3" }
+}
