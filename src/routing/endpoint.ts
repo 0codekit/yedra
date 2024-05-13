@@ -48,8 +48,8 @@ export type EndpointOptions<
 };
 
 export const endpoint = <
-  Query extends ObjectSchema<unknown>,
-  Headers extends ObjectSchema<unknown>,
+  Query extends Schema<unknown>,
+  Headers extends Schema<unknown>,
   Req extends Schema<unknown>,
   Res extends Schema<unknown>,
 >(
@@ -128,19 +128,24 @@ export const endpoint = <
   };
 };
 
-const paramDocs = <Params extends ObjectSchema<unknown>>(
+const paramDocs = <Params extends Schema<unknown>>(
   params: Params,
   position: string,
 ): object[] => {
   const result: object[] = [];
   const docs = params.documentation();
+  if (!('properties' in docs) || !Array.isArray(docs.properties)) {
+    return result;
+  }
+  const required =
+    'required' in docs && Array.isArray(docs.required) ? docs.required : [];
   for (const name in docs.properties) {
     const property = docs.properties[name];
     result.push({
       name: name,
       in: position,
       description: 'description' in property ? property.description : undefined,
-      required: docs.required?.includes(name) ?? false,
+      required: required.includes(name) ?? false,
       schema: property,
     });
   }

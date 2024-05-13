@@ -74,11 +74,7 @@ export class ObjectSchema<Shape> extends ModifiableSchema<
     return result;
   }
 
-  public override documentation(): {
-    type: 'object';
-    properties: Record<string, object>;
-    required?: string[];
-  } {
+  public override documentation(): object {
     const properties: Record<string, object> = {};
     const required: string[] = [];
     for (const prop in this.shape) {
