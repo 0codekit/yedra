@@ -19,11 +19,11 @@ export class Path {
     }
     this.expected = path.substring(1).split('/');
     const invalidSegment = this.expected.find(
-      (part) => !part.match(/^(:?[a-z0-9]+\??)|\*$/),
+      (part) => part.match(/^((:?[a-z0-9-]+\??)|\*)$/) === null,
     );
     if (invalidSegment) {
       throw new Error(
-        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^(:?[a-z0-9]+\\??)|\\*$/.`,
+        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^((:?[a-z0-9-]+\\??)|\\*)$/.`,
       );
     }
     const wildcard = this.expected.findIndex((part) => part === '*');
@@ -91,14 +91,17 @@ export class Path {
       if (this.expected[i].startsWith(':')) {
         // parameter, accept anything
         params[Path.normalizeParam(this.expected[i])] = actual[i];
-      } else if (this.expected[i] !== actual[i].toLowerCase()) {
+      } else if (
+        Path.normalizeParam(this.expected[i]) !== actual[i].toLowerCase()
+      ) {
         // not a parameter, and the values don't match
         return undefined;
       }
     }
     if (
       actual.length < this.expected.length &&
-      !this.expected[actual.length].endsWith('?')
+      !this.expected[actual.length].endsWith('?') &&
+      this.expected[actual.length] !== '*'
     ) {
       // path is incomplete
       return undefined;
@@ -116,8 +119,8 @@ export class Path {
       result = result.substring(1);
     }
     if (result.endsWith('?')) {
-      result = result.substring(0, param.length - 1);
+      result = result.substring(0, result.length - 1);
     }
-    return param;
+    return result;
   }
 }
