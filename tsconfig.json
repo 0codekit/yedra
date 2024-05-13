@@ -3,8 +3,8 @@
     "declaration": true,
     "outDir": "dist",
 
-    "target": "ES5",
-    "module": "CommonJS",
+    "target": "ES2015",
+    "module": "ES2015",
     "allowJs": true,
 
     // Best practices

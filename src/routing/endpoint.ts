@@ -1,6 +1,5 @@
 import { isUint8Array } from 'node:util/types';
 import { ValidationError } from '../validation/error';
-import type { ObjectSchema } from '../validation/object';
 import type { Schema, Typeof } from '../validation/schema';
 import { BadRequestError } from './errors';
 import { Log } from './log';

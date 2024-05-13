@@ -1,3 +1,6 @@
+import { Path } from './routing/path';
+import type { Router } from './routing/router';
+
 // routing
 export {
   type EndpointOptions,
@@ -17,6 +20,24 @@ export {
 export { listen } from './routing/listen';
 export { Log } from './routing/log';
 export { router, type Endpoint } from './routing/router';
+export const validatePath = (path: string) => new Path(path);
+export const documentation = (
+  router: Router,
+  options: {
+    info: {
+      title: string;
+      description: string;
+      version: string;
+    };
+    servers: { url: string; description: string }[];
+  },
+): object => {
+  return {
+    openapi: '3.0.2',
+    ...options,
+    paths: router.documentation(),
+  };
+};
 
 // validation
 export { array } from './validation/array';

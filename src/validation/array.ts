@@ -5,9 +5,9 @@ import type { Schema, Typeof } from './schema';
 class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
   Typeof<ItemSchema>[]
 > {
-  private readonly _itemSchema: ItemSchema;
-  private readonly _minItems?: number;
-  private readonly _maxItems?: number;
+  private readonly itemSchema: ItemSchema;
+  private readonly minItems?: number;
+  private readonly maxItems?: number;
 
   public constructor(
     itemSchema: ItemSchema,
@@ -15,9 +15,9 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
     maxItems?: number,
   ) {
     super();
-    this._itemSchema = itemSchema;
-    this._minItems = minItems;
-    this._maxItems = maxItems;
+    this.itemSchema = itemSchema;
+    this.minItems = minItems;
+    this.maxItems = maxItems;
   }
 
   /**
@@ -25,7 +25,7 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
    * @param items - The minimum number of items.
    */
   public min(items: number): ArraySchema<ItemSchema> {
-    return new ArraySchema(this._itemSchema, items, this._maxItems);
+    return new ArraySchema(this.itemSchema, items, this.maxItems);
   }
 
   /**
@@ -33,7 +33,7 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
    * @param items - The maximum number of items.
    */
   public max(items: number): ArraySchema<ItemSchema> {
-    return new ArraySchema(this._itemSchema, this._minItems, items);
+    return new ArraySchema(this.itemSchema, this.minItems, items);
   }
 
   /**
@@ -42,7 +42,7 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
    * @param items - The number of items.
    */
   public length(items: number): ArraySchema<ItemSchema> {
-    return new ArraySchema(this._itemSchema, items, items);
+    return new ArraySchema(this.itemSchema, items, items);
   }
 
   public parse(obj: unknown): Typeof<ItemSchema>[] {
@@ -51,22 +51,22 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
         new Issue('invalidType', [], 'array', typeof obj),
       ]);
     }
-    if (this._minItems && obj.length < this._minItems) {
+    if (this.minItems && obj.length < this.minItems) {
       throw new ValidationError([
         new Issue(
           'tooShort',
           [],
-          this._minItems.toString(),
+          this.minItems.toString(),
           obj.length.toString(),
         ),
       ]);
     }
-    if (this._maxItems && obj.length > this._maxItems) {
+    if (this.maxItems && obj.length > this.maxItems) {
       throw new ValidationError([
         new Issue(
           'tooLong',
           [],
-          this._maxItems.toString(),
+          this.maxItems.toString(),
           obj.length.toString(),
         ),
       ]);
@@ -75,7 +75,7 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
     const issues: Issue[] = [];
     for (let i = 0; i < obj.length; ++i) {
       try {
-        elems.push(this._itemSchema.parse(obj[i]));
+        elems.push(this.itemSchema.parse(obj[i]));
       } catch (error) {
         if (error instanceof ValidationError) {
           issues.push(...error.withPrefix(i.toString()));
@@ -93,9 +93,9 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
   public documentation(): object {
     return {
       type: 'array',
-      items: this._itemSchema.documentation(),
-      minItems: this._minItems,
-      maxItems: this._maxItems,
+      items: this.itemSchema.documentation(),
+      minItems: this.minItems,
+      maxItems: this.maxItems,
     };
   }
 }
