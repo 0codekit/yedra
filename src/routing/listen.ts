@@ -1,11 +1,11 @@
-import Bun from 'bun';
+import { serve } from 'bun';
 import type { Router } from './router';
 
 const parseQuery = (url: URL): Record<string, string | undefined> => {
   const result: Record<string, string | undefined> = {};
-  for (const key of url.searchParams.keys()) {
-    result[key] = url.searchParams.get(key) as string;
-  }
+  url.searchParams.forEach((value, key) => {
+    result[key] = value;
+  });
   return result;
 };
 
@@ -24,7 +24,7 @@ const parseHeaders = (headers: Headers): Record<string, string | undefined> => {
 export const listen = (router: Router, options?: { port?: number }) => {
   const port = options?.port ?? 3000;
   console.info(`y listening on localhost:${port}...`);
-  Bun.serve({
+  serve({
     port,
     async fetch(req: Request): Promise<Response> {
       const url = new URL(req.url);

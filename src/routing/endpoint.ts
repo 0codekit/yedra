@@ -19,12 +19,12 @@ export type EndpointRequest<Query, Headers, Req> = {
 export type EndpointResponse<Res> =
   | Promise<{
       status?: number;
-      body: Res;
+      body: Res | Uint8Array;
       headers?: Record<string, string>;
     }>
   | {
       status?: number;
-      body: Res;
+      body: Res | Uint8Array;
       headers?: Record<string, string>;
     };
 
