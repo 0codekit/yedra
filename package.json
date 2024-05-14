@@ -1,21 +1,21 @@
 {
   "name": "@wemakefuture/y",
-  "description": "A TypeScript web framework with OpenAPI generation.",
+  "version": "0.1.0",
   "author": {
     "name": "WeMakeFuture AG"
   },
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "devDependencies": {
+    "@biomejs/biome": "^1.7.3",
+    "@types/bun": "latest",
+    "typescript": "^5.4.5"
+  },
+  "description": "A TypeScript web framework with OpenAPI generation.",
+  "license": "MIT",
   "scripts": {
     "check": "biome check *",
     "format": "biome format *",
     "prepublish": "tsc"
   },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
-  },
-  "dependencies": { "@biomejs/biome": "^1.7.3" }
+  "types": "dist/index.d.ts"
 }
