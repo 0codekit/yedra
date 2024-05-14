@@ -1,3 +1,4 @@
+import { ValidationError } from './error';
 import { ModifiableSchema } from './modifiable';
 import type { Schema } from './schema';
 
@@ -12,8 +13,30 @@ export class IntersectionSchema<T, U> extends ModifiableSchema<T & U> {
   }
 
   public parse(obj: unknown): T & U {
-    const left = this.left.parse(obj);
-    const right = this.right.parse(obj);
+    const issues = [];
+    let left: T | undefined = undefined;
+    let right: U | undefined = undefined;
+    try {
+      left = this.left.parse(obj);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        issues.push(...error.issues);
+      } else {
+        throw error;
+      }
+    }
+    try {
+      right = this.right.parse(obj);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        issues.push(...error.issues);
+      } else {
+        throw error;
+      }
+    }
+    if (!(left && right)) {
+      throw new ValidationError(issues);
+    }
     return { ...left, ...right };
   }
 

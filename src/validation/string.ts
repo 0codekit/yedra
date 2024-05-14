@@ -51,7 +51,7 @@ class PatternStringSchema extends ModifiableSchema<string> {
   public override documentation(): object {
     return {
       type: 'string',
-      pattern: this.pattern,
+      pattern: this.pattern.source,
     };
   }
 }

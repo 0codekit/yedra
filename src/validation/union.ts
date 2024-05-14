@@ -13,17 +13,19 @@ class UnionSchema<T extends [...Schema<unknown>[]]> extends ModifiableSchema<
   }
 
   public parse(obj: unknown): T[number]['_typeof'] {
+    const issues = [];
     for (const option of this.options) {
       try {
         return option.parse(obj);
-      } catch (_error) {
-        // TODO: store this error message somewhere
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.issues);
+        } else {
+          throw error;
+        }
       }
     }
-    // TODO: improve this error message!
-    throw new ValidationError([
-      new Issue('invalidType', [], 'any', typeof obj),
-    ]);
+    throw new ValidationError(issues);
   }
 
   public documentation(): object {

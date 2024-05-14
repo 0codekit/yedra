@@ -12,3 +12,32 @@ using y schemas.
 
 y was built for use with Bun, so it uses `Bun.serve`. This might be changed in
 the future to make Bun usable with Node.js, too.
+
+## Getting Started
+
+```bash
+bun add @wemakefuture/y
+```
+
+```ts
+import { y } from "@wemakefuture/y";
+
+const endpoint = y.endpoint("/up", {
+  summary: "Get server status.",
+  method: "GET",
+  query: y.object({}),
+  headers: y.object({}),
+  req: y.object({}),
+  res: y.object({ message: y.string() }),
+  do(req) {
+    return { body: { message: "Healthy." } };
+  },
+});
+
+const router = y.router();
+router.add(endpoint);
+
+y.listen(router, { port: 3000 });
+```
+
+Also, see the [documentation](./docs/endpoints.md).

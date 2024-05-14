@@ -19,7 +19,14 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
     ) {
       throw new ValidationError([
         // TODO: better validation message
-        new Issue('invalidType', [], 'string', typeof obj),
+        new Issue(
+          'invalidType',
+          [],
+          this.options.join(', '),
+          typeof obj === 'string' || typeof obj === 'number'
+            ? obj.toString()
+            : typeof obj,
+        ),
       ]);
     }
     return obj;
@@ -28,8 +35,6 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
   public documentation(): object {
     return {
       anyOf: this.options.map((option) => ({
-        // TODO: what about number enums?
-        type: 'string',
         const: option,
       })),
     };
