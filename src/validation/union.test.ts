@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { union } from './union';
-import { string } from './string';
 import { number } from './number';
+import { string } from './string';
+import { union } from './union';
 
 test('Validate Union', () => {
   const schema = union(string(), number());

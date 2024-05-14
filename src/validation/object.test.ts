@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { object } from './object';
 import { number } from './number';
+import { object } from './object';
 import { string } from './string';
 
 test('Validate Object', () => {

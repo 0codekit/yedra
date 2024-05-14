@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { intersection } from './intersection';
-import { object } from './object';
 import { number } from './number';
+import { object } from './object';
 import { string } from './string';
 
 test('Validate Intersection', () => {

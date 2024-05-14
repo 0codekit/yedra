@@ -13,8 +13,8 @@
   "description": "A TypeScript web framework with OpenAPI generation.",
   "license": "MIT",
   "scripts": {
-    "check": "biome check *",
-    "format": "biome format *",
+    "check": "biome check src/*",
+    "format": "biome format src/*",
     "prepublish": "tsc"
   },
   "types": "dist/index.d.ts"
