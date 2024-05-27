@@ -41,7 +41,9 @@ export class IntersectionSchema<T, U> extends ModifiableSchema<T & U> {
   }
 
   public documentation(): object {
-    throw new Error('Method not implemented.');
+    return {
+      allOf: [this.left.documentation(), this.right.documentation()],
+    };
   }
 }
 

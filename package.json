@@ -1,21 +1,22 @@
 {
   "name": "@wemakefuture/y",
-  "version": "0.1.0",
-  "author": {
-    "name": "WeMakeFuture AG"
-  },
-  "main": "dist/index.js",
-  "devDependencies": {
-    "@biomejs/biome": "^1.7.3",
-    "@types/bun": "^1.1.2",
-    "typescript": "^5.4.5"
-  },
+  "version": "0.1.1",
   "description": "A TypeScript web framework with OpenAPI generation.",
+  "keywords": ["typescript", "web", "http", "schema", "validation", "openapi"],
+  "bugs": "https://github.com/wemakefuture/y/issues",
   "license": "MIT",
+  "contributors": ["Justus Zorn <jzorn@wemakefuture.com>"],
+  "main": "dist/index.js",
+  "repository": "github:wemakefuture/y",
   "scripts": {
     "check": "biome check src/*",
     "format": "biome format src/*",
     "prepublish": "tsc"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.7.3",
+    "@types/bun": "^1.1.2",
+    "typescript": "^5.4.5"
   },
   "types": "dist/index.d.ts"
 }
