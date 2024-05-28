@@ -33,12 +33,12 @@ class NumberSchema extends ModifiableSchema<number> {
         new Issue('invalidType', [], 'number', typeof obj),
       ]);
     }
-    if (this.minValue && obj < this.minValue) {
+    if (this.minValue !== undefined && obj < this.minValue) {
       throw new ValidationError([
         new Issue('tooSmall', [], this.minValue.toString(), obj.toString()),
       ]);
     }
-    if (this.maxValue && obj > this.maxValue) {
+    if (this.maxValue !== undefined && obj > this.maxValue) {
       throw new ValidationError([
         new Issue('tooBig', [], this.maxValue.toString(), obj.toString()),
       ]);
