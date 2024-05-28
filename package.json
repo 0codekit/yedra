@@ -1,6 +1,6 @@
 {
   "name": "@wemakefuture/y",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A TypeScript web framework with OpenAPI generation.",
   "keywords": ["typescript", "web", "http", "schema", "validation", "openapi"],
   "bugs": "https://github.com/wemakefuture/y/issues",
