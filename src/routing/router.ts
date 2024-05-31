@@ -49,87 +49,27 @@ export class Router {
       req.method !== 'PUT' &&
       req.method !== 'DELETE'
     ) {
-      return {
-        status: 405,
-        body: Buffer.from(
-          JSON.stringify({
-            status: 405,
-            error: `Method '${req.method}' not allowed.`,
-          }),
-        ),
-        headers: {
-          'content-type': 'application/json',
-        },
-      };
+      return Router.errorResponse(405, `Method '${req.method}' not allowed.`);
     }
-    let invalidMethod = false;
-    for (const endpoint of this.endpoints) {
-      const params = endpoint.path.match(req.url);
-      if (!params) {
-        continue;
+    const match = this.matchEndpoint(req.url, req.method);
+    if (!match.result) {
+      if (match.invalidMethod) {
+        return Router.errorResponse(
+          405,
+          `Method '${req.method}' not allowed for path '${req.url}'.`,
+        );
       }
-      if (!endpoint.methods.includes(req.method)) {
-        invalidMethod = true;
-        continue;
-      }
-      try {
-        return await endpoint.handle(req, params);
-      } catch (error) {
-        if (error instanceof HttpError) {
-          return {
-            status: error.status,
-            body: Buffer.from(
-              JSON.stringify({
-                status: error.status,
-                error: error.message,
-              }),
-            ),
-            headers: {
-              'content-type': 'application/json',
-            },
-          };
-        }
-        console.error(error);
-        return {
-          status: 500,
-          body: Buffer.from(
-            JSON.stringify({
-              status: 500,
-              error: 'Internal Server Error.',
-            }),
-          ),
-          headers: {
-            'content-type': 'application/json',
-          },
-        };
-      }
+      return Router.errorResponse(404, `Path '${req.url}' not found.`);
     }
-    if (invalidMethod) {
-      return {
-        status: 405,
-        body: Buffer.from(
-          JSON.stringify({
-            status: 405,
-            error: `Method '${req.method}' not allowed for path '${req.url}'.`,
-          }),
-        ),
-        headers: {
-          'content-type': 'application/json',
-        },
-      };
+    try {
+      return await match.result.endpoint.handle(req, match.result.params);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Router.errorResponse(error.status, error.message);
+      }
+      console.error(error);
+      return Router.errorResponse(500, 'Internal Server Error.');
     }
-    return {
-      status: 404,
-      body: Buffer.from(
-        JSON.stringify({
-          status: 404,
-          error: `Path '${req.url}' not found.`,
-        }),
-      ),
-      headers: {
-        'content-type': 'application/json',
-      },
-    };
   }
 
   /**
@@ -149,6 +89,45 @@ export class Router {
       paths[path] = methods;
     }
     return paths;
+  }
+
+  private static errorResponse(status: number, error: string) {
+    return {
+      status,
+      body: Buffer.from(
+        JSON.stringify({
+          status,
+          error,
+        }),
+      ),
+      headers: {
+        'content-type': 'application/json',
+      },
+    };
+  }
+
+  private matchEndpoint(url: string, method: Method) {
+    let invalidMethod = false;
+    let result:
+      | { endpoint: Endpoint; params: Record<string, string>; score: number }
+      | undefined = undefined;
+    for (const endpoint of this.endpoints) {
+      const params = endpoint.path.match(url);
+      if (!params) {
+        continue;
+      }
+      if (!endpoint.methods.includes(method)) {
+        invalidMethod = true;
+        continue;
+      }
+      const score = Object.keys(params).length;
+      const previous = result?.score;
+      if (previous === undefined || score < previous) {
+        // if there was no previous match or this one is better, use it
+        result = { endpoint, params, score };
+      }
+    }
+    return { invalidMethod, result };
   }
 }
 

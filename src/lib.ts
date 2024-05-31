@@ -19,7 +19,7 @@ export {
 } from './routing/errors';
 export { listen } from './routing/listen';
 export { Log } from './routing/log';
-export { router, type Endpoint } from './routing/router';
+export { router, type Router, type Endpoint } from './routing/router';
 export const validatePath = (path: string) => {
   new Path(path);
 };

@@ -1,4 +1,4 @@
-import { serve } from 'bun';
+import { type IncomingHttpHeaders, createServer } from 'node:http';
 import type { Router } from './router';
 
 const parseQuery = (url: URL): Record<string, string | undefined> => {
@@ -9,37 +9,44 @@ const parseQuery = (url: URL): Record<string, string | undefined> => {
   return result;
 };
 
-const parseHeaders = (headers: Headers): Record<string, string | undefined> => {
+const parseHeaders = (
+  headers: IncomingHttpHeaders,
+): Record<string, string | undefined> => {
   const result: Record<string, string | undefined> = {};
-  headers.forEach((value, key) => {
-    if (result[key]) {
-      result[key] = `${result[key]};${value}`;
+  for (const [key, value] of Object.entries(headers)) {
+    if (!value) {
+      continue;
+    }
+    if (Array.isArray(value)) {
+      result[key] = value.join(';');
     } else {
       result[key] = value;
     }
-  });
+  }
   return result;
 };
 
 export const listen = (router: Router, options?: { port?: number }) => {
   const port = options?.port ?? 3000;
-  console.info(`y listening on localhost:${port}...`);
-  serve({
-    port,
-    async fetch(req: Request): Promise<Response> {
-      const url = new URL(req.url);
-      console.info(`${req.method} ${url.pathname}`);
+  createServer((req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    req.on('end', async () => {
+      const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+      const url = new URL(req.url ?? '', `http://${req.headers.host}`);
       const response = await router.handle({
-        method: req.method,
+        method: req.method ?? 'GET',
         url: url.pathname,
         query: parseQuery(url),
         headers: parseHeaders(req.headers),
-        body: Buffer.from(await req.arrayBuffer()),
+        body,
       });
-      return new Response(response.body, {
-        status: response.status,
-        headers: response.headers,
-      });
-    },
+      res.writeHead(response.status, response.headers);
+      res.end(response.body);
+    });
+  }).listen(port, () => {
+    console.info(`y listening on localhost:${port}...`);
   });
 };
