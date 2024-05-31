@@ -1,13 +1,12 @@
 {
   "name": "@wemakefuture/y",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "repository": "github:wemakefuture/y",
   "main": "dist/index.js",
   "devDependencies": {
     "@biomejs/biome": "^1.7.3",
     "@types/bun": "^1.1.2",
     "@types/node": "^20.12.13",
-    "glob": "^10.4.1",
     "typescript": "^5.4.5"
   },
   "bin": {
@@ -23,5 +22,8 @@
     "format": "biome format src/*",
     "prepublish": "tsc"
   },
-  "types": "dist/index.d.ts"
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "glob": "^10.4.1"
+  }
 }

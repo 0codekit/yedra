@@ -8,7 +8,7 @@ import { newScript } from './new';
 if (process.argv.length < 3 || process.argv[2] === 'help') {
   helpScript();
 } else if (process.argv[2] === 'version') {
-  console.info('@wemakefuture/y 0.2.0');
+  console.info('@wemakefuture/y 0.2.1');
 } else if (process.argv[2] === 'init') {
   initScript();
 } else if (process.argv[2] === 'fix') {
