@@ -5,7 +5,8 @@ import { BodyType } from './body';
  */
 export abstract class Schema<T> extends BodyType<T> {
   public deserialize(buffer: Uint8Array): T {
-    const data = JSON.parse(Buffer.from(buffer).toString('utf-8'));
+    const data =
+      buffer.length > 0 ? JSON.parse(Buffer.from(buffer).toString('utf8')) : {};
     return this.parse(data);
   }
 

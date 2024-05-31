@@ -64,11 +64,7 @@ export const endpoint = <
       let query: Typeof<Query>;
       let headers: Typeof<Headers>;
       try {
-        const rawBody =
-          req.body && req.body.length > 0
-            ? JSON.parse(req.body.toString())
-            : {};
-        body = options.req.deserialize(rawBody);
+        body = options.req.deserialize(req.body);
         query = options.query.parse(req.query);
         headers = options.headers.parse(req.headers);
       } catch (error) {

@@ -34,7 +34,7 @@ export const listen = (router: Router, options?: { port?: number }) => {
       chunks.push(chunk);
     });
     req.on('end', async () => {
-      const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+      const body = Buffer.concat(chunks);
       const url = new URL(req.url ?? '', `http://${req.headers.host}`);
       const response = await router.handle({
         method: req.method ?? 'GET',

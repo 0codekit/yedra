@@ -8,7 +8,7 @@ type HttpReq = {
   url: string;
   query: unknown;
   headers: unknown;
-  body: Buffer | undefined;
+  body: Uint8Array;
 };
 
 type HttpRes = {
