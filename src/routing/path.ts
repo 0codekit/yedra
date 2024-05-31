@@ -19,17 +19,11 @@ export class Path {
     }
     this.expected = path.substring(1).split('/');
     const invalidSegment = this.expected.find(
-      (part) => part.match(/^((:?[a-z0-9-]+\??)|\*)$/) === null,
+      (part) => part.match(/^(:?[a-z0-9-]+\??)$/) === null,
     );
     if (invalidSegment) {
       throw new Error(
-        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^((:?[a-z0-9-]+\\??)|\\*)$/.`,
-      );
-    }
-    const wildcard = this.expected.findIndex((part) => part === '*');
-    if (wildcard !== -1 && wildcard !== this.expected.length - 1) {
-      throw new Error(
-        `API path ${path} is invalid: * must be the last path segment.`,
+        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^(:?[a-z0-9-]+\\??)$/.`,
       );
     }
     const firstOptional = this.expected.findIndex((part) => part.endsWith('?'));
@@ -73,21 +67,18 @@ export class Path {
   /**
    * Match this API path to a string. If the string matches the path, this
    * returns a record mapping the path parameters (e.g. `:id`) to the values
-   * found in the actual string. Otherwise, it returns undefined.
+   * found in the actual string. Otherwise, it returns
+   * undefined.
    * @param path - The string path to match.
    */
   public match(path: string): Record<string, string> | undefined {
     const params: Record<string, string> = {};
     const actual = path.substring(1).split('/');
-    if (this.expected.length < actual.length && !this.expected.includes('*')) {
-      // path can only be longer than expected if expected includes a wildcard
+    if (this.expected.length < actual.length) {
+      // path cannot be longer than expected
       return undefined;
     }
     for (let i = 0; i < actual.length; ++i) {
-      if (this.expected[i] === '*') {
-        // wildcard, parsing successful
-        return params;
-      }
       if (this.expected[i].startsWith(':')) {
         // parameter, accept anything
         params[Path.normalizeParam(this.expected[i])] = actual[i];
@@ -100,8 +91,7 @@ export class Path {
     }
     if (
       actual.length < this.expected.length &&
-      !this.expected[actual.length].endsWith('?') &&
-      this.expected[actual.length] !== '*'
+      !this.expected[actual.length].endsWith('?')
     ) {
       // path is incomplete
       return undefined;
