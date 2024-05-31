@@ -1,6 +1,7 @@
+import type { Typeof } from './body';
 import { Issue, ValidationError } from './error';
 import { ModifiableSchema } from './modifiable';
-import type { Schema, Typeof } from './schema';
+import type { Schema } from './schema';
 
 class RecordSchema<
   ValueSchema extends Schema<unknown>,

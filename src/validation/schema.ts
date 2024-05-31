@@ -1,10 +1,12 @@
+import { BodyType } from './body';
+
 /**
  * The base class for all schemas.
  */
-export abstract class Schema<T> {
-  public _typeof: T;
-  public constructor() {
-    this._typeof = undefined as T;
+export abstract class Schema<T> extends BodyType<T> {
+  public deserialize(buffer: Uint8Array): T {
+    const data = JSON.parse(Buffer.from(buffer).toString('utf-8'));
+    return this.parse(data);
   }
 
   /**
@@ -26,13 +28,3 @@ export abstract class Schema<T> {
     return false;
   }
 }
-
-/**
- * Get the type that is parsed by a schema.
- *
- * ```typescript
- * const schema = y.string();
- * type SchemaType = y.Typeof<typeof schema>; // string
- * ```
- */
-export type Typeof<T extends Schema<unknown>> = T['_typeof'];

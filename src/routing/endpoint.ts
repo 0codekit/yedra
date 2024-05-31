@@ -1,6 +1,7 @@
 import { isUint8Array } from 'node:util/types';
+import type { BodyType, Typeof } from '../validation/body';
 import { ValidationError } from '../validation/error';
-import type { Schema, Typeof } from '../validation/schema';
+import type { Schema } from '../validation/schema';
 import { BadRequestError } from './errors';
 import { Log } from './log';
 import { Path } from './path';
@@ -18,19 +19,19 @@ export type EndpointRequest<Query, Headers, Req> = {
 export type EndpointResponse<Res> =
   | Promise<{
       status?: number;
-      body: Res | Uint8Array;
+      body: Res;
       headers?: Record<string, string>;
     }>
   | {
       status?: number;
-      body: Res | Uint8Array;
+      body: Res;
       headers?: Record<string, string>;
     };
 
 export type EndpointOptions<
   Query extends Schema<unknown>,
   Headers extends Schema<unknown>,
-  Req extends Schema<unknown>,
+  Req extends BodyType<unknown>,
   Res extends Schema<unknown>,
   Ext,
 > = {
@@ -49,7 +50,7 @@ export type EndpointOptions<
 export const endpoint = <
   Query extends Schema<unknown>,
   Headers extends Schema<unknown>,
-  Req extends Schema<unknown>,
+  Req extends BodyType<unknown>,
   Res extends Schema<unknown>,
 >(
   path: string,
@@ -67,7 +68,7 @@ export const endpoint = <
           req.body && req.body.length > 0
             ? JSON.parse(req.body.toString())
             : {};
-        body = options.req.parse(rawBody);
+        body = options.req.deserialize(rawBody);
         query = options.query.parse(req.query);
         headers = options.headers.parse(req.headers);
       } catch (error) {
@@ -109,18 +110,14 @@ export const endpoint = <
         ...paramDocs(options.query, 'query'),
         ...paramDocs(options.headers, 'header'),
       ];
-      // TODO: handle other kinds of request body, e.g. none or raw
+      // TODO: generate request body documentation
       return {
         summary: options.summary,
         description: options.description,
         parameters,
         requestBody: {
           required: true,
-          content: {
-            'application/json': {
-              schema: options.req.documentation(),
-            },
-          },
+          content: {},
         },
       };
     },

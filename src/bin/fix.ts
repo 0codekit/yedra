@@ -1,6 +1,6 @@
-import { glob } from 'glob';
 import { writeFile } from 'node:fs/promises';
-import { sep, posix } from 'node:path';
+import { posix, sep } from 'node:path';
+import { glob } from 'glob';
 
 export const fixScript = async () => {
   const routes = await glob('./routes/**/*.ts', {
