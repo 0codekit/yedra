@@ -7,7 +7,7 @@ export abstract class BodyType<T> {
     this._typeof = undefined as T;
   }
 
-  public abstract deserialize(buffer: Uint8Array): T;
+  public abstract deserialize(buffer: Uint8Array, contentType: string): T;
 }
 
 /**

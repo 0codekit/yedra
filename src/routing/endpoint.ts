@@ -64,7 +64,10 @@ export const endpoint = <
       let query: Typeof<Query>;
       let headers: Typeof<Headers>;
       try {
-        body = options.req.deserialize(req.body);
+        body = options.req.deserialize(
+          req.body,
+          req.headers['content-type'] ?? 'application/octet-stream',
+        );
         query = options.query.parse(req.query);
         headers = options.headers.parse(req.headers);
       } catch (error) {

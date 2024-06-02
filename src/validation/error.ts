@@ -5,7 +5,8 @@ type IssueCode =
   | 'tooShort'
   | 'tooLong'
   | 'invalidPattern'
-  | 'missingProperty';
+  | 'missingProperty'
+  | 'invalidContentType';
 
 const issueMessages: Record<IssueCode, string> = {
   invalidType: "Expected '${expected}' but got '${actual}'",
@@ -15,6 +16,7 @@ const issueMessages: Record<IssueCode, string> = {
   tooLong: "Must have at most '${expected}' elements, but has '${actual}'",
   invalidPattern: "'${actual}' does not match pattern '${expected}'",
   missingProperty: 'Required',
+  invalidContentType: "Expected content type '${expected}' but got '${actual}'",
 };
 
 export class Issue {

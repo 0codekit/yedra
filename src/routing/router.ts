@@ -6,8 +6,8 @@ export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 type HttpReq = {
   method: string;
   url: string;
-  query: unknown;
-  headers: unknown;
+  query: Record<string, string | undefined>;
+  headers: Record<string, string | undefined>;
   body: Uint8Array;
 };
 
