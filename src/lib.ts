@@ -54,6 +54,7 @@ export { record } from './validation/record';
 export { Schema } from './validation/schema';
 export { BodyType, type Typeof } from './validation/body';
 export { raw } from './validation/raw';
+export { either } from './validation/either';
 export { string } from './validation/string';
 export { _undefined as undefined } from './validation/undefined';
 export { union } from './validation/union';
