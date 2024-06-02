@@ -32,7 +32,7 @@ export type EndpointOptions<
   Query extends Schema<unknown>,
   Headers extends Schema<unknown>,
   Req extends BodyType<unknown>,
-  Res extends Schema<unknown>,
+  Res extends BodyType<unknown>,
   Ext,
 > = {
   summary: string;
@@ -51,7 +51,7 @@ export const endpoint = <
   Query extends Schema<unknown>,
   Headers extends Schema<unknown>,
   Req extends BodyType<unknown>,
-  Res extends Schema<unknown>,
+  Res extends BodyType<unknown>,
 >(
   path: string,
   options: EndpointOptions<Query, Headers, Req, Res, object>,
