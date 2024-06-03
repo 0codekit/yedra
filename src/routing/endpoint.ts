@@ -3,12 +3,14 @@ import type { BodyType, Typeof } from '../validation/body';
 import { ValidationError } from '../validation/error';
 import type { Schema } from '../validation/schema';
 import { BadRequestError } from './errors';
+import { Http } from './http';
 import { Log } from './log';
 import { Path } from './path';
 import type { Endpoint } from './router';
 
 export type EndpointRequest<Query, Headers, Req> = {
   log: Log;
+  http: Http;
   url: string;
   params: Record<string, string>;
   query: Query;
@@ -80,8 +82,10 @@ export const endpoint = <
         throw error;
       }
       const log = new Log();
+      const http = new Http(log);
       const response = await options.do({
         log,
+        http,
         url: req.url,
         params,
         query,
