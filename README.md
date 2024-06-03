@@ -21,8 +21,10 @@ automatic generation of OpenAPI documentation for all endpoints. This includes
 generating JSON schemas for all request and response bodies that are specified
 using y schemas.
 
-y was built for use with Bun, so it uses `Bun.serve`. This might be changed in
-the future to make Bun usable with Node.js, too.
+y was built for use with Bun. The library itself does not use anything
+Bun-specific and can therefore also be used with Node, but the CLI needs
+`Bun.Glob` and has to import TypeScript files directly, so it can only be used
+when Bun is installed.
 
 ## Getting Started
 

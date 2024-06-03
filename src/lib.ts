@@ -23,23 +23,6 @@ export { router, type Router, type Endpoint } from './routing/router';
 export const validatePath = (path: string) => {
   new Path(path);
 };
-export const documentation = (
-  router: Router,
-  options: {
-    info: {
-      title: string;
-      description: string;
-      version: string;
-    };
-    servers: { url: string; description: string }[];
-  },
-): object => {
-  return {
-    openapi: '3.0.2',
-    ...options,
-    paths: router.documentation(),
-  };
-};
 
 // validation
 export { array } from './validation/array';

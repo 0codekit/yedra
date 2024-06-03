@@ -2,6 +2,7 @@ export const helpScript = async () => {
   console.info(`usage: y COMMAND ...
 
 Available commands:
+    doc      Generate OpenAPI documentation.
     fix      Generate the src/router.ts file.
     help     Print this help menu.
     init     Init a new y project.

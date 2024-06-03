@@ -1,6 +1,6 @@
 {
   "name": "@wemakefuture/y",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "repository": "github:wemakefuture/y",
   "main": "dist/index.js",
   "devDependencies": {
@@ -22,8 +22,5 @@
     "format": "biome format src/*",
     "prepublish": "tsc"
   },
-  "types": "dist/index.d.ts",
-  "dependencies": {
-    "glob": "^10.4.1"
-  }
+  "types": "dist/index.d.ts"
 }

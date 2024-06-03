@@ -1,15 +1,12 @@
 import { writeFile } from 'node:fs/promises';
 import { posix, sep } from 'node:path';
-import { glob } from 'glob';
+import { Glob } from 'bun';
 
 export const fixScript = async () => {
-  const routes = await glob('./routes/**/*.ts', {
-    cwd: './src',
-    dotRelative: true,
-  });
+  const routes = new Glob('./routes/**/*.ts');
   let result = `/* WARNING: This file was auto-generated. Changes will be overwritten. To regenerate it, execute 'bun y fix'. */\nimport { y } from '@wemakefuture/y';\n`;
   let routeId = 0;
-  for await (const routePath of routes) {
+  for await (const routePath of routes.scan('./src')) {
     const route = routePath.split(sep).join(posix.sep);
     if (shouldIgnore(route)) {
       // skip tests and route
