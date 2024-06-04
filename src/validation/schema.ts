@@ -6,7 +6,7 @@ import { Issue, ValidationError } from './error';
  */
 export abstract class Schema<T> extends BodyType<T> {
   public deserialize(buffer: Uint8Array, contentType: string): T {
-    if (contentType !== 'application/json') {
+    if (contentType !== 'application/json' && buffer.length > 0) {
       throw new ValidationError([
         new Issue('invalidContentType', [], 'application/json', contentType),
       ]);

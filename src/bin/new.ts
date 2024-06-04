@@ -32,7 +32,6 @@ export default y.endpoint('${path}', {
   }),
   do(req) {
     return {
-      status: 200,
       body: { message: 'Hello, world!' },
     };
   },
