@@ -29,6 +29,14 @@ class EitherBody<T extends [...BodyType<unknown>[]]> extends BodyType<
     }
     throw new ValidationError(issues);
   }
+
+  public bodyDocs(): object {
+    let docs: object = {};
+    for (const option of this.options) {
+      docs = { ...docs, ...option.bodyDocs() };
+    }
+    return docs;
+  }
 }
 
 /**

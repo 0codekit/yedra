@@ -18,7 +18,7 @@ type HttpRes = {
 };
 
 export type Endpoint = {
-  methods: Method[];
+  method: Method;
   path: Path;
   handle: (req: HttpReq, params: Record<string, string>) => Promise<HttpRes>;
   documentation: () => object;
@@ -80,12 +80,10 @@ export class Router {
     for (const endpoint of this.endpoints) {
       const path = endpoint.path.toString();
       const methods = paths[path] ?? {};
-      for (const method of endpoint.methods) {
-        methods[method.toLowerCase()] = {
-          tags: [endpoint.path.category()],
-          ...endpoint.documentation(),
-        };
-      }
+      methods[endpoint.method.toLowerCase()] = {
+        tags: [endpoint.path.category()],
+        ...endpoint.documentation(),
+      };
       paths[path] = methods;
     }
     return paths;
@@ -116,7 +114,7 @@ export class Router {
       if (!params) {
         continue;
       }
-      if (!endpoint.methods.includes(method)) {
+      if (endpoint.method !== method) {
         invalidMethod = true;
         continue;
       }

@@ -16,6 +16,14 @@ export abstract class Schema<T> extends BodyType<T> {
     return this.parse(data);
   }
 
+  public bodyDocs(): object {
+    return {
+      'application/json': {
+        schema: this.documentation(),
+      },
+    };
+  }
+
   /**
    * Parse the object with this schema. This throws a
    * `ValidationError` if the object is invalid.

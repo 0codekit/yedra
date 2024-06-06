@@ -59,7 +59,7 @@ export const endpoint = <
   options: EndpointOptions<Query, Headers, Req, Res, object>,
 ): Endpoint => {
   return {
-    methods: [options.method],
+    method: options.method,
     path: new Path(path),
     async handle(req, params) {
       let body: Typeof<Req>;
@@ -120,7 +120,29 @@ export const endpoint = <
         parameters,
         requestBody: {
           required: true,
-          content: {},
+          content: options.req.bodyDocs(),
+        },
+        responses: {
+          '200': {
+            content: options.res.bodyDocs(),
+          },
+          '400': {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    status: {
+                      type: 'number',
+                    },
+                    error: {
+                      type: 'string',
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       };
     },

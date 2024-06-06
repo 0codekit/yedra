@@ -7,7 +7,17 @@ export abstract class BodyType<T> {
     this._typeof = undefined as T;
   }
 
+  /**
+   * Deserialize a raw buffer.
+   * @param buffer - The raw body.
+   * @param contentType - The content type.
+   */
   public abstract deserialize(buffer: Uint8Array, contentType: string): T;
+
+  /**
+   * Generate OpenAPI docs for this body.
+   */
+  public abstract bodyDocs(): object;
 }
 
 /**
