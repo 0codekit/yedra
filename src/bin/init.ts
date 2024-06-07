@@ -33,9 +33,17 @@ export default y.endpoint('/up', {
     `import { y } from '@wemakefuture/y';
 import router from './router';
 
-y.listen(router, {
+const context = y.listen(router, {
   port: 3000,
 });
+
+const onExit = async () => {
+  await context.stop();
+  process.exit(0);
+};
+
+process.on('SIGINT', onExit);
+process.on('SIGTERM', onExit);
 `,
   );
 };
