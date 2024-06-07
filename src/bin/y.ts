@@ -11,7 +11,7 @@ if (process.argv.length < 3 || process.argv[2] === 'help') {
 } else if (process.argv[2] === 'doc') {
   docScript();
 } else if (process.argv[2] === 'version') {
-  console.info('@wemakefuture/y 0.3.10');
+  console.info('@wemakefuture/y 0.3.11');
 } else if (process.argv[2] === 'init') {
   initScript();
 } else if (process.argv[2] === 'fix') {

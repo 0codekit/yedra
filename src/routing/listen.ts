@@ -1,4 +1,4 @@
-import { type IncomingHttpHeaders, createServer } from 'node:http';
+import { type IncomingHttpHeaders, type Server, createServer } from 'node:http';
 import type { Router } from './router';
 
 const parseQuery = (url: URL): Record<string, string | undefined> => {
@@ -26,9 +26,9 @@ const parseHeaders = (
   return result;
 };
 
-export const listen = (router: Router, options?: { port?: number }) => {
+export const listen = (router: Router, options?: { port?: number }): Server => {
   const port = options?.port ?? 3000;
-  createServer((req, res) => {
+  const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => {
       chunks.push(chunk);
@@ -47,7 +47,9 @@ export const listen = (router: Router, options?: { port?: number }) => {
       res.writeHead(response.status, response.headers);
       res.end(response.body);
     });
-  }).listen(port, () => {
+  });
+  server.listen(port, () => {
     console.info(`y listening on localhost:${port}...`);
   });
+  return server;
 };
