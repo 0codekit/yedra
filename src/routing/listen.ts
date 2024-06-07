@@ -26,9 +26,54 @@ const parseHeaders = (
   return result;
 };
 
-export const listen = (router: Router, options?: { port?: number }): Server => {
-  const port = options?.port ?? 3000;
+export interface Context {
+  stop(): Promise<void>;
+}
+
+class ConcreteContext implements Context {
+  private server: Server;
+  private activeConns = 0;
+  private resolve: (() => void) | undefined;
+
+  public constructor(server: Server) {
+    this.server = server;
+  }
+
+  public async stop(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.server.close((error) => {
+        if (error !== undefined) {
+          reject(error);
+        } else if (this.activeConns === 0) {
+          resolve();
+        } else {
+          this.resolve = resolve;
+        }
+      });
+    });
+  }
+
+  public addConn() {
+    this.activeConns += 1;
+  }
+
+  public removeConn() {
+    this.activeConns -= 1;
+    if (this.activeConns === 0 && this.resolve !== undefined) {
+      this.resolve();
+    }
+  }
+}
+
+export const listen = (router: Router, options: { port: number }): Context => {
+  const addConn = () => {
+    context.addConn();
+  };
+  const removeConn = () => {
+    context.removeConn();
+  };
   const server = createServer((req, res) => {
+    addConn();
     const chunks: Buffer[] = [];
     req.on('data', (chunk) => {
       chunks.push(chunk);
@@ -46,10 +91,12 @@ export const listen = (router: Router, options?: { port?: number }): Server => {
       });
       res.writeHead(response.status, response.headers);
       res.end(response.body);
+      removeConn();
     });
   });
-  server.listen(port, () => {
-    console.info(`y listening on localhost:${port}...`);
+  const context = new ConcreteContext(server);
+  server.listen(options.port, () => {
+    console.info(`y listening on localhost:${options.port}...`);
   });
-  return server;
+  return context;
 };
