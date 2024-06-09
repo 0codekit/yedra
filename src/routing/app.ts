@@ -143,6 +143,14 @@ export const app = async (routes: string): Promise<App> => {
   for await (const endpoint of glob.scan({
     absolute: true,
   })) {
+    if (
+      endpoint.endsWith('.test.ts') ||
+      endpoint.endsWith('.schema.ts') ||
+      endpoint.endsWith('.util.ts') ||
+      endpoint.endsWith('.d.ts')
+    ) {
+      continue;
+    }
     const imp = await import(endpoint);
     endpoints.push(imp.default);
   }
