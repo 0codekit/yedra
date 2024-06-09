@@ -1,3 +1,4 @@
+import { Glob } from 'bun';
 import { HttpError } from './errors';
 import type { Path } from './path';
 
@@ -25,16 +26,25 @@ export type Endpoint = {
 };
 
 export class Router {
-  private endpoints: Endpoint[] = [];
+  private endpoints: Endpoint[];
+
+  private constructor(endpoints: Endpoint[]) {
+    this.endpoints = endpoints;
+  }
 
   /**
-   * Add an endpoint. The order in which endpoints are added is relevant. If
-   * multiple matching endpoints exist, the first one is used. This is
-   * important when using wildcards and parameters.
-   * @param endpoint - The endpoint.
+   * Create a router for the `src/routes` directory.
    */
-  public add(endpoint: Endpoint) {
-    this.endpoints.push(endpoint);
+  public static async create(): Promise<Router> {
+    const glob = new Glob('src/routes/**/*.ts');
+    const endpoints: Endpoint[] = [];
+    for await (const endpoint of glob.scan({
+      absolute: true,
+    })) {
+      const imp = await import(endpoint);
+      endpoints.push(imp.default);
+    }
+    return new Router(endpoints);
   }
 
   /**
@@ -128,8 +138,3 @@ export class Router {
     return { invalidMethod, result };
   }
 }
-
-/**
- * Create a new router.
- */
-export const router = (): Router => new Router();

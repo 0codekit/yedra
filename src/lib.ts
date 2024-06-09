@@ -17,9 +17,9 @@ export {
   NotFoundError,
   ConflictError,
 } from './routing/errors';
-export { listen, Context } from './routing/listen';
+export { listen, type Context } from './routing/listen';
 export { Log } from './routing/log';
-export { router, type Router, type Endpoint } from './routing/router';
+export { type Endpoint } from './routing/router';
 export const validatePath = (path: string) => {
   new Path(path);
 };

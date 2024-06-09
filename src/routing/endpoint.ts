@@ -113,7 +113,6 @@ export const endpoint = <
         ...paramDocs(options.query, 'query'),
         ...paramDocs(options.headers, 'header'),
       ];
-      // TODO: generate request body documentation
       return {
         summary: options.summary,
         description: options.description,

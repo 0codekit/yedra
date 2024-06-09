@@ -1,5 +1,5 @@
 import { type IncomingHttpHeaders, type Server, createServer } from 'node:http';
-import type { Router } from './router';
+import { Router } from './router';
 
 const parseQuery = (url: URL): Record<string, string | undefined> => {
   const result: Record<string, string | undefined> = {};
@@ -65,7 +65,8 @@ class ConcreteContext implements Context {
   }
 }
 
-export const listen = (router: Router, options: { port: number }): Context => {
+export const listen = async (port: number): Promise<Context> => {
+  const router = await Router.create();
   const addConn = () => {
     context.addConn();
   };
@@ -95,8 +96,8 @@ export const listen = (router: Router, options: { port: number }): Context => {
     });
   });
   const context = new ConcreteContext(server);
-  server.listen(options.port, () => {
-    console.info(`y listening on localhost:${options.port}...`);
+  server.listen(port, () => {
+    console.info(`y listening on localhost:${port}...`);
   });
   return context;
 };

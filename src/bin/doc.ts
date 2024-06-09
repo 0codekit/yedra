@@ -1,10 +1,11 @@
 import { readFile, writeFile } from 'node:fs/promises';
+import { Router } from '../routing/router';
 
 export const docScript = async () => {
   const packageJson = JSON.parse(
     (await readFile('package.json')).toString('utf-8'),
   );
-  const router = (await import(`${process.cwd()}/src/router.ts`)).default;
+  const router = await Router.create();
   const docs = {
     openapi: '3.0.2',
     info: {

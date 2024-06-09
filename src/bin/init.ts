@@ -31,11 +31,8 @@ export default y.endpoint('/up', {
   await writeFile(
     './src/index.ts',
     `import { y } from '@wemakefuture/y';
-import router from './router';
 
-const context = y.listen(router, {
-  port: 3000,
-});
+const context = y.listen(3000);
 
 const onExit = async () => {
   await context.stop();

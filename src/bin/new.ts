@@ -1,6 +1,5 @@
 import { writeFile } from 'node:fs/promises';
 import { validatePath } from '../lib';
-import { fixScript } from './fix';
 
 export const newScript = async () => {
   if (process.argv.length < 4) {
@@ -38,5 +37,4 @@ export default y.endpoint('${path}', {
 });
 `,
   );
-  await fixScript();
 };
