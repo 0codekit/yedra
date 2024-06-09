@@ -1,5 +1,5 @@
 import { type IncomingHttpHeaders, type Server, createServer } from 'node:http';
-import { Router } from './router';
+import type { App } from './app';
 
 const parseQuery = (url: URL): Record<string, string | undefined> => {
   const result: Record<string, string | undefined> = {};
@@ -65,8 +65,7 @@ class ConcreteContext implements Context {
   }
 }
 
-export const listen = async (port: number): Promise<Context> => {
-  const router = await Router.create();
+export const listen = (app: App, port: number): Context => {
   const addConn = () => {
     context.addConn();
   };
@@ -83,7 +82,7 @@ export const listen = async (port: number): Promise<Context> => {
       const body = Buffer.concat(chunks);
       const url = new URL(req.url ?? '', `http://${req.headers.host}`);
       console.info(`${req.method} ${url.pathname}`);
-      const response = await router.handle({
+      const response = await app.handle({
         method: req.method ?? 'GET',
         url: url.pathname,
         query: parseQuery(url),

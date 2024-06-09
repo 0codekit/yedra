@@ -1,5 +1,4 @@
 import { Path } from './routing/path';
-import type { Router } from './routing/router';
 
 // routing
 export {
@@ -17,9 +16,9 @@ export {
   NotFoundError,
   ConflictError,
 } from './routing/errors';
-export { listen, type Context } from './routing/listen';
+export { type Context } from './routing/listen';
 export { Log } from './routing/log';
-export { type Endpoint } from './routing/router';
+export { type Endpoint, app } from './routing/app';
 export const validatePath = (path: string) => {
   new Path(path);
 };

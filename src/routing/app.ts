@@ -1,5 +1,6 @@
 import { Glob } from 'bun';
 import { HttpError } from './errors';
+import { type Context, listen } from './listen';
 import type { Path } from './path';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -25,26 +26,11 @@ export type Endpoint = {
   documentation: () => object;
 };
 
-export class Router {
+export class App {
   private endpoints: Endpoint[];
 
-  private constructor(endpoints: Endpoint[]) {
+  public constructor(endpoints: Endpoint[]) {
     this.endpoints = endpoints;
-  }
-
-  /**
-   * Create a router for the `src/routes` directory.
-   */
-  public static async create(): Promise<Router> {
-    const glob = new Glob('src/routes/**/*.ts');
-    const endpoints: Endpoint[] = [];
-    for await (const endpoint of glob.scan({
-      absolute: true,
-    })) {
-      const imp = await import(endpoint);
-      endpoints.push(imp.default);
-    }
-    return new Router(endpoints);
   }
 
   /**
@@ -59,33 +45,36 @@ export class Router {
       req.method !== 'PUT' &&
       req.method !== 'DELETE'
     ) {
-      return Router.errorResponse(405, `Method '${req.method}' not allowed.`);
+      return App.errorResponse(405, `Method '${req.method}' not allowed.`);
     }
     const match = this.matchEndpoint(req.url, req.method);
     if (!match.result) {
       if (match.invalidMethod) {
-        return Router.errorResponse(
+        return App.errorResponse(
           405,
           `Method '${req.method}' not allowed for path '${req.url}'.`,
         );
       }
-      return Router.errorResponse(404, `Path '${req.url}' not found.`);
+      return App.errorResponse(404, `Path '${req.url}' not found.`);
     }
     try {
       return await match.result.endpoint.handle(req, match.result.params);
     } catch (error) {
       if (error instanceof HttpError) {
-        return Router.errorResponse(error.status, error.message);
+        return App.errorResponse(error.status, error.message);
       }
       console.error(error);
-      return Router.errorResponse(500, 'Internal Server Error.');
+      return App.errorResponse(500, 'Internal Server Error.');
     }
   }
 
   /**
-   * Generate documentation for the router and all endpoints.
+   * Generate OpenAPI documentation for the app.
    */
-  public documentation(): object {
+  public docs(options: {
+    info: { title: string; description: string; version: string };
+    servers: { description: string; url: string }[];
+  }): object {
     const paths: Record<string, Record<string, object>> = {};
     for (const endpoint of this.endpoints) {
       const path = endpoint.path.toString();
@@ -96,7 +85,16 @@ export class Router {
       };
       paths[path] = methods;
     }
-    return paths;
+    return {
+      openapi: '3.0.2',
+      info: options.info,
+      servers: options.servers,
+      paths,
+    };
+  }
+
+  public listen(port: number): Context {
+    return listen(this, port);
   }
 
   private static errorResponse(status: number, error: string) {
@@ -138,3 +136,15 @@ export class Router {
     return { invalidMethod, result };
   }
 }
+
+export const app = async (routes: string): Promise<App> => {
+  const glob = new Glob(`${routes}/**/*.ts`);
+  const endpoints: Endpoint[] = [];
+  for await (const endpoint of glob.scan({
+    absolute: true,
+  })) {
+    const imp = await import(endpoint);
+    endpoints.push(imp.default);
+  }
+  return new App(endpoints);
+};
