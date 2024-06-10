@@ -1,4 +1,4 @@
-import { Glob } from 'bun';
+import { glob } from 'glob';
 import { HttpError } from './errors';
 import { type Context, listen } from './listen';
 import type { Path } from './path';
@@ -137,22 +137,35 @@ export class App {
   }
 }
 
+const shouldIgnore = (path: string): boolean => {
+  const extensions = [
+    '.test.ts',
+    '.schema.ts',
+    '.util.ts',
+    '.d.ts',
+    '.test.js',
+    '.schema.js',
+    '.util.js',
+  ];
+  for (const extension of extensions) {
+    if (path.endsWith(extension)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 export const app = async (routes: string): Promise<App> => {
-  const glob = new Glob(`${routes}/**/*.ts`);
   const endpoints: Endpoint[] = [];
-  for await (const endpoint of glob.scan({
+  const files = await glob([`${routes}/**/*.ts`, `${routes}/**/*.js`], {
     absolute: true,
-  })) {
-    if (
-      endpoint.endsWith('.test.ts') ||
-      endpoint.endsWith('.schema.ts') ||
-      endpoint.endsWith('.util.ts') ||
-      endpoint.endsWith('.d.ts')
-    ) {
+  });
+  for (const file of files) {
+    if (shouldIgnore(file)) {
       continue;
     }
-    const imp = await import(endpoint);
-    endpoints.push(imp.default);
+    const endpoint = await import(file);
+    endpoints.push(endpoint.default);
   }
   return new App(endpoints);
 };

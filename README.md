@@ -5,8 +5,10 @@
 - [Introduction](#introduction)
 - [Getting Started](#getting-started)
 - [Endpoints](#endpoints)
-- [Routers](#routers)
+- [Apps](#apps)
+- [Error Handling](#error-handling)
 - [Schemas](#schemas)
+- [HTTP Client](#http-client)
 - [Paths](#paths)
 
 ## Introduction
@@ -21,21 +23,22 @@ automatic generation of OpenAPI documentation for all endpoints. This includes
 generating JSON schemas for all request and response bodies that are specified
 using y schemas.
 
-y was built for use with Bun. The library itself does not use anything
-Bun-specific and can therefore also be used with Node, but the CLI needs
-`Bun.Glob` and has to import TypeScript files directly, so it can only be used
-when Bun is installed.
-
 ## Getting Started
 
+First, install y with your favorite package manager:
+
 ```bash
+npm install @wemakefuture/y
+yarn add @wemakefuture/y
 bun add @wemakefuture/y
 ```
+
+Then, create your first endpoint in `src/routes/up.ts`:
 
 ```ts
 import { y } from "@wemakefuture/y";
 
-const endpoint = y.endpoint("/up", {
+export default y.endpoint("/up", {
   summary: "Get server status.",
   method: "GET",
   query: y.object({}),
@@ -43,24 +46,36 @@ const endpoint = y.endpoint("/up", {
   req: y.object({}),
   res: y.object({ message: y.string() }),
   do(req) {
-    return { body: { message: "Healthy." } };
+    return {
+      body: {
+        message: "Healthy.",
+      },
+    };
   },
 });
-
-const router = y.router();
-router.add(endpoint);
-
-y.listen(router, { port: 3000 });
 ```
+
+And add this to `src/index.ts`:
+
+```ts
+import { y } from "@wemakefuture/y";
+
+y.app(`${__dirname}/routes`).then((app) => {
+  app.listen(3000);
+});
+```
+
+This starts a server with all endpoints in `src/routes` and listens on
+port 3000.
 
 ## Endpoints
 
 The core construct of y is the `endpoint`. Endpoints are created like this:
 
 ```ts
-import { y } from "./src/index";
+import { y } from "@wemakefuture/y";
 
-const endpoint = y.endpoint("/up", {
+export default y.endpoint("/up", {
   summary: "Get server status.",
   description:
     "Returns a 200 status code if the server is running, otherwise a 502.",
@@ -98,7 +113,7 @@ This is a lot, so let's break it down:
 3. `description` is an optional longer description that will appear after
    expanding the OpenAPI documentation for this endpoint.
 4. `method` is the HTTP method used to access the endpoint. Options are `GET`,
-   `POST`, `PUT`, and `DELETE`. More might be added later.
+   `POST`, `PUT`, and `DELETE`.
 5. `query` is the schema for the query parameters.
 6. `headers` is the schema for the HTTP headers.
 7. `req` is the schema for the request body. This should be empty for `GET` and
@@ -108,53 +123,64 @@ This is a lot, so let's break it down:
    async, and must return a response body, and optionally status codes and
    headers.
 
-Schemas are described in more detail [here](#schemas).
+Schemas are described in more detail [here](#schemas). In more complex
+endpoints, [error handling](#error-handling) is also an important topic.
 
 Inside the `do` function, the request data can be accessed using the `req`
 parameter.
 
-1. `req.log` is a request-specific logger. Currently, the logger isn't used for
+1. `req.body` is the validated request body, matching the schema specified for
+   the endpoint.
+2. `req.headers` is just like `req.query`, but for headers.
+3. `req.http` is a request-specific HTTP client, which is described in detail
+   [here](#http-client).
+4. `req.log` is a request-specific logger. Currently, the logger isn't used for
    anything and just prints everything to the console, but that will change in
    the future.
-2. `req.params` are the parameters extracted from the path. Unfortunately, they
+5. `req.params` are the parameters extracted from the path. Unfortunately, they
    are not type-checked statically.
-3. `req.query` is the typed object containing all query parameters. If the query
+6. `req.query` is the typed object containing all query parameters. If the query
    parameters do not match the schema specified for the endpoint, an error is
    raised.
-4. `req.headers` is just like `req.query`, but for headers.
-5. `req.url` is the HTTP path, so it does not include the hostname, and starts
+7. `req.url` is the HTTP path, so it does not include the hostname, and starts
    with `/`.
-6. `req.body` is the validated request body, matching the schema specified for
-   the endpoint.
 
-## Routers
+## Apps
 
-Creating an endpoint alone doesn't do anything, it has to be added to a router.
-A router is a collection of [endpoints](./endpoints.md). You can create a router
-and add endpoints like this:
+Endpoints are always part of an entire application. With y, you create an
+application like this:
 
 ```ts
-const router = y.router();
-router.add(endpoint0);
-router.add(endpoint1);
+const app = await y.app(`${__dirname}/routes`);
 ```
 
-You can start a server using a router like this:
+This will automatically find all endpoints in the provided directory. Right now,
+all `.ts` and `.js` files are loaded, except for any `.test.ts`, `.schema.ts`,
+`.util.ts`, `.d.ts`, `.test.js`, `.schema.js`, or `.util.js` files. Only the
+default export is considered as an endpoint, so every endpoint will need to be
+put into its own file. The `routes` path should be absolute. There is currently
+no way to add endpoints manually to an application.
+
+Once the application is created, it can be started like this:
 
 ```ts
-y.listen(router, {
-  port: 3000,
-});
+const context = app.listen(3000);
 ```
 
-This hosts all endpoints on `localhost:3000`. Please note that this uses
-`Bun.serve` in the moment, which means that this will not work with Node.js in
-the moment.
-
-You can also generate OpenAPI documentation from the router like this:
+This starts an HTTP server and listens on port 3000. The `context` that is
+returned can be used for stopping the server again:
 
 ```ts
-const docs = y.documentation(router, {
+await context.stop();
+```
+
+This stops the server, but still continues to serve all current connections.
+Once every connection is closed, the method returns.
+
+Apps can also be used to generate OpenAPI documentation:
+
+```ts
+const docs = app.docs({
   info: {
     title: "My title.",
     description: "My description.",
@@ -167,10 +193,8 @@ const docs = y.documentation(router, {
     },
   ],
 });
+console.log(docs);
 ```
-
-This includes the info given to the method, as well as the documentation for
-every endpoint.
 
 ## Schemas
 
@@ -200,17 +224,49 @@ all schemas:
 - y.unknown
 
 These are the same names as the schemas in Zod. Some schemas, like `z.any` in
-Zod, won't be added to y, since it's not good style to use any. Instead, use
-`y.unknown` and use explicit type-checking.
+Zod, won't be added to y, since using any leads to lots of type unsafety.
+Instead, use `y.unknown` and use explicit type-checking.
+
+There is also the more general `y.BodyType`. All of the above schemas are
+subclasses of `y.BodyType`, but there are also:
+
+- y.raw, which accepts any raw buffer with the specified content type
+- y.either, which works just like y.union, except it may also contain a y.raw
 
 Schemas can be passed to [endpoints](./endpoints.md) for validation, but you can
 use them to validate things yourself, too. You can do that with the `y.parse`
 function. It takes an unknown value and returns a typed and parsed value, or
 throws a `y.ValiationError`.
 
-If you need to use the type of `schema`, you can do this using
-`y.Typeof<typeof schema>`. In this case, `typeof schema` is the TypeScript type
-of the schema itself, and `y.Typeof` turns that into the parsed type.
+If you need to use the type of a `y.BodyType`, you can do this using
+`y.Typeof<typeof bodyType>`. In this case, `typeof bodyType` is the TypeScript
+type of the schema itself, and `y.Typeof` turns that into the parsed type.
+
+## Error Handling
+
+It is generally possible to return any status code from an endpoint, including
+status codes that indicate failure. However, it is often simpler to just throw
+an error, especially in nested method calls. To reduce boilerplate code
+associated with catching these errors, y automatically handles errors derived
+from `y.HttpError`, and returns their message and status code as an HTTP
+response. There are some predefined error classes:
+
+- `y.BadRequestError`
+- `y.UnauthorizedError`
+- `y.PaymentRequiredError`
+- `y.ForbiddenError`
+- `y.NotFoundError`
+- `y.ConflictError`
+
+If any other error is thrown inside an endpoint and not caught, y will
+automatically return a 500 response, with the message `Internal Server Error`.
+This is supposed to prevent accidental leakage of sensitive information.
+
+## HTTP Client
+
+y contains a small embedded HTTP client that directly interfaces with the
+logger. It is similar to Axios, but based on `fetch`. You can access the HTTP
+client using `req.http`, the methods are fairly self-explanatory.
 
 ## Paths
 
