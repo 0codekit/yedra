@@ -38,14 +38,6 @@ export class Path {
   }
 
   /**
-   * The category of the path. This is simply the first segment.
-   * @returns The path category.
-   */
-  public category(): string {
-    return this.expected[0];
-  }
-
-  /**
    * Prepends this path with another path. This is equivalent to
    * `new Path(prefix + path.toString()).
    * @param prefix - The prefix to prepend.

@@ -39,6 +39,7 @@ export type EndpointOptions<
 > = {
   summary: string;
   description?: string;
+  category?: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   query: Query;
   headers: Headers;
@@ -114,6 +115,7 @@ export const endpoint = <
         ...paramDocs(options.headers, 'header'),
       ];
       return {
+        tags: [options.category ?? path.split('/')[1]],
         summary: options.summary,
         description: options.description,
         parameters,
@@ -123,9 +125,11 @@ export const endpoint = <
         },
         responses: {
           '200': {
+            description: 'Success',
             content: options.res.bodyDocs(),
           },
           '400': {
+            description: 'Bad Request',
             content: {
               'application/json': {
                 schema: {

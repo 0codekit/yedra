@@ -1,6 +1,6 @@
 {
   "name": "@wemakefuture/y",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "repository": "github:wemakefuture/y",
   "main": "dist/index.js",
   "devDependencies": {
@@ -15,9 +15,7 @@
   "keywords": ["typescript", "web", "http", "schema", "validation", "openapi"],
   "license": "MIT",
   "scripts": {
-    "check": "biome check src/*",
-    "format": "biome format src/*",
-    "prepublish": "tsc"
+    "check": "biome check src/*"
   },
   "types": "dist/index.d.ts",
   "dependencies": {

@@ -79,10 +79,7 @@ export class App {
     for (const endpoint of this.endpoints) {
       const path = endpoint.path.toString();
       const methods = paths[path] ?? {};
-      methods[endpoint.method.toLowerCase()] = {
-        tags: [endpoint.path.category()],
-        ...endpoint.documentation(),
-      };
+      methods[endpoint.method.toLowerCase()] = endpoint.documentation();
       paths[path] = methods;
     }
     return {

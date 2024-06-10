@@ -10,6 +10,7 @@
 - [Schemas](#schemas)
 - [HTTP Client](#http-client)
 - [Paths](#paths)
+- [Changelog](#changelog)
 
 ## Introduction
 
@@ -284,3 +285,34 @@ path and throws an exception if it is invalid.
 
 The path parameters can be accessed inside [endpoints](./endpoints.md) using
 `req.params`.
+
+## Changelog
+
+y generally tries to follow a semantic versioning model. Right now, y is
+pre-1.0, so breaking changes can occur on every minor release.
+
+- 0.6.4 - Added changelog and custom category option for endpoints
+- 0.6.3 - Updated documentation and fixed NodeJS compatibility
+- 0.6.2 - Fixed auto-importing of utility files
+- 0.6.1 - Fixed auto-import error
+- 0.6.0 - Replaced `y.router` with `y.app`, removed CLI completely
+- 0.5.0 - Removed need for `y fix`
+- 0.4.1 - Updated `y init` command
+- 0.4.0 - Added listen context to correctly terminate server
+- 0.3.11 - Added basic way to stop server after `y.listen`
+- 0.3.10 - Improved OpenAPI generation
+- 0.3.9 - Fixed parsing of empty JSON body
+- 0.3.8 - Fixed incorrect NPM version
+- 0.3.7 - Added `y doc` command
+- 0.3.6 - Added `req.http` client
+- 0.3.5 - Added log on each request
+- 0.3.4 - Fixed endpoint result schema
+- 0.3.3 - Fixed `y.either` export status
+- 0.3.2 - Added `y.either`
+- 0.3.1 - Fixed request body parsing
+- 0.3.0 - Added `y.raw`
+- 0.2.1 - Fix for `y fix` command
+- 0.2.0 - Added NodeJS support and CLI interface
+- 0.1.2 - Fixed y.number() minimum and maximum checks
+- 0.1.1 - Added test cases, documentation and license
+- 0.1.0 - Initial release
