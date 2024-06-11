@@ -291,6 +291,7 @@ The path parameters can be accessed inside [endpoints](./endpoints.md) using
 y generally tries to follow a semantic versioning model. Right now, y is
 pre-1.0, so breaking changes can occur on every minor release.
 
+- 0.6.5 - Fixed crash when validation error occurs
 - 0.6.4 - Added changelog and custom category option for endpoints
 - 0.6.3 - Updated documentation and fixed NodeJS compatibility
 - 0.6.2 - Fixed auto-importing of utility files
