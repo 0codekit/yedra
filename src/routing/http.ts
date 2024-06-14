@@ -118,7 +118,15 @@ export class Http {
     return this.request('POST', url, body, headers);
   }
 
-  private async request(
+  /**
+   * Performs an HTTP request on the given URL. The body is converted to JSON.
+   * @param method - The HTTP method.
+   * @param url - The URL.
+   * @param body - The body.
+   * @param headers - The HTTP headers.
+   * @returns The response.
+   */
+  public async request(
     method: 'GET' | 'POST',
     url: string,
     body: unknown,
