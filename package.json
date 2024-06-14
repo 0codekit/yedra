@@ -1,6 +1,6 @@
 {
   "name": "@wemakefuture/y",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "repository": "github:wemakefuture/y",
   "main": "dist/index.js",
   "devDependencies": {
