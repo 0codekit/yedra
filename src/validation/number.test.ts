@@ -7,9 +7,9 @@ test('Validate Number', () => {
   expect(schema.documentation()).toMatchObject({
     type: 'number',
   });
-  const result: number = schema.parse(100);
-  expect(result).toStrictEqual(100);
-  expect(() => schema.parse('100')).toThrow(
+  expect(schema.parse(100)).toStrictEqual(100);
+  expect(schema.parse('100')).toStrictEqual(100);
+  expect(() => schema.parse('hello')).toThrow(
     `Error at '': Expected 'number' but got 'string'.`,
   );
 });

@@ -28,22 +28,28 @@ class NumberSchema extends ModifiableSchema<number> {
   }
 
   public override parse(obj: unknown): number {
-    if (typeof obj !== 'number') {
+    if (typeof obj !== 'number' && typeof obj !== 'string') {
       throw new ValidationError([
         new Issue('invalidType', [], 'number', typeof obj),
       ]);
     }
-    if (this.minValue !== undefined && obj < this.minValue) {
+    const num = typeof obj === 'number' ? obj : Number.parseFloat(obj);
+    if (Number.isNaN(num)) {
       throw new ValidationError([
-        new Issue('tooSmall', [], this.minValue.toString(), obj.toString()),
+        new Issue('invalidType', [], 'number', typeof obj),
       ]);
     }
-    if (this.maxValue !== undefined && obj > this.maxValue) {
+    if (this.minValue !== undefined && num < this.minValue) {
       throw new ValidationError([
-        new Issue('tooBig', [], this.maxValue.toString(), obj.toString()),
+        new Issue('tooSmall', [], this.minValue.toString(), num.toString()),
       ]);
     }
-    return obj;
+    if (this.maxValue !== undefined && num > this.maxValue) {
+      throw new ValidationError([
+        new Issue('tooBig', [], this.maxValue.toString(), num.toString()),
+      ]);
+    }
+    return num;
   }
 
   public override documentation(): object {

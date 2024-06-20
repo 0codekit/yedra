@@ -22,6 +22,8 @@ export { type Endpoint, app } from './routing/app';
 export const validatePath = (path: string) => {
   new Path(path);
 };
+export { TestService } from './routing/test';
+export { parseEnv } from './routing/env';
 
 // validation
 export { array } from './validation/array';

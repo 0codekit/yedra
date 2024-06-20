@@ -291,6 +291,7 @@ The path parameters can be accessed inside [endpoints](./endpoints.md) using
 y generally tries to follow a semantic versioning model. Right now, y is
 pre-1.0, so breaking changes can occur on every minor release.
 
+- 0.7.0 - Added test service and env parser
 - 0.6.7 - Fixed failed 0.6.6 release
 - 0.6.6 - Made `request` method of `y.Http` public
 - 0.6.5 - Fixed crash when validation error occurs
