@@ -19,7 +19,7 @@ export class TestService {
 
   public async get(
     path: string,
-    headers: Record<string, string>,
+    headers?: Record<string, string>,
   ): Promise<HttpResponse> {
     return await this.request('GET', path, undefined, headers);
   }
@@ -27,7 +27,7 @@ export class TestService {
   public async post(
     path: string,
     body: unknown,
-    headers: Record<string, string>,
+    headers?: Record<string, string>,
   ): Promise<HttpResponse> {
     return await this.request('POST', path, body, headers);
   }
