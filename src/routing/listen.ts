@@ -53,6 +53,10 @@ class ConcreteContext implements Context {
     });
   }
 
+  public connectionCount(): number {
+    return this.activeConns;
+  }
+
   public addConn() {
     this.activeConns += 1;
   }
@@ -81,7 +85,11 @@ export const listen = (app: App, port: number): Context => {
     req.on('end', async () => {
       const body = Buffer.concat(chunks);
       const url = new URL(req.url ?? '', `http://${req.headers.host}`);
-      console.info(`${req.method} ${url.pathname}`);
+      console.info(
+        `[${new Date().toISOString()}] ${req.method} ${
+          url.pathname
+        } (${context.connectionCount()} connections)`,
+      );
       const response = await app.handle({
         method: req.method ?? 'GET',
         url: url.pathname,
