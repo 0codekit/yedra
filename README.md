@@ -291,6 +291,8 @@ The path parameters can be accessed inside [endpoints](./endpoints.md) using
 y generally tries to follow a semantic versioning model. Right now, y is
 pre-1.0, so breaking changes can occur on every minor release.
 
+- 0.8.0 - Removed `identity` encoding, changed error field to `errorMessage`
+- 0.7.3 - Changed `accept-encoding` for `y.Http` to `identity` to prevent memory leak
 - 0.7.2 - Added time and connection count to connection log
 - 0.7.1 - Made headers on test service methods optional
 - 0.7.0 - Added test service and env parser

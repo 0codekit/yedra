@@ -94,13 +94,13 @@ export class App {
     return listen(this, port);
   }
 
-  private static errorResponse(status: number, error: string) {
+  private static errorResponse(status: number, errorMessage: string) {
     return {
       status,
       body: Buffer.from(
         JSON.stringify({
           status,
-          error,
+          errorMessage,
         }),
       ),
       headers: {
