@@ -1,6 +1,6 @@
 {
   "name": "yedra",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
@@ -14,7 +14,7 @@
   "description": "A TypeScript web framework with OpenAPI generation.",
   "keywords": ["typescript", "web", "http", "schema", "validation", "openapi"],
   "license": "MIT",
-  "files": ["./dist/*"],
+  "files": ["./dist/**"],
   "scripts": {
     "check": "biome check src/*"
   },
