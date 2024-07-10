@@ -1,5 +1,5 @@
-import { BodyType, type Typeof } from './body';
-import { ValidationError } from './error';
+import { BodyType, type Typeof } from './body.js';
+import { ValidationError } from './error.js';
 
 class EitherBody<T extends [...BodyType<unknown>[]]> extends BodyType<
   Typeof<T[number]>

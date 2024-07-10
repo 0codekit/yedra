@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { Path } from './path';
+import { Path } from './path.js';
 
 test('Path Invalid', () => {
   expect(() => new Path('abc/test')).toThrow(

@@ -1,7 +1,7 @@
 import { glob } from 'glob';
-import { HttpError } from './errors';
-import { type Context, listen } from './listen';
-import type { Path } from './path';
+import { HttpError } from './errors.js';
+import { type Context, listen } from './listen.js';
+import type { Path } from './path.js';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 

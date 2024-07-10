@@ -1,6 +1,6 @@
-import { Issue, ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
-import type { Schema } from './schema';
+import { Issue, ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
+import type { Schema } from './schema.js';
 
 class UnionSchema<T extends [...Schema<unknown>[]]> extends ModifiableSchema<
   T[number]['_typeof']

@@ -1,5 +1,5 @@
 import { type IncomingHttpHeaders, type Server, createServer } from 'node:http';
-import type { App } from './app';
+import type { App } from './app.js';
 
 const parseQuery = (url: URL): Record<string, string | undefined> => {
   const result: Record<string, string | undefined> = {};

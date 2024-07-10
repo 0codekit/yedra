@@ -1,6 +1,6 @@
-import { ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
-import type { Schema } from './schema';
+import { ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
+import type { Schema } from './schema.js';
 
 export class IntersectionSchema<T, U> extends ModifiableSchema<T & U> {
   private left: Schema<T>;

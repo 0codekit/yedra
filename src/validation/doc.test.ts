@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { number } from './number';
+import { number } from './number.js';
 
 test('Doc Schema', () => {
   const schema = number().doc({

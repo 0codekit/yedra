@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { date } from './date';
+import { date } from './date.js';
 
 test('Validate Date', () => {
   const schema = date();

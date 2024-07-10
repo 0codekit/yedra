@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { intersection } from './intersection';
-import { number } from './number';
-import { object } from './object';
-import { string } from './string';
+import { intersection } from './intersection.js';
+import { number } from './number.js';
+import { object } from './object.js';
+import { string } from './string.js';
 
 test('Validate Intersection', () => {
   const schema = intersection(

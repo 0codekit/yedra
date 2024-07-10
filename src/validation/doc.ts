@@ -1,4 +1,4 @@
-import { Schema } from './schema';
+import { Schema } from './schema.js';
 
 export class DocSchema<T> extends Schema<T> {
   private readonly _schema: Schema<T>;

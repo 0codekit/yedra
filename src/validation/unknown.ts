@@ -1,4 +1,4 @@
-import { ModifiableSchema } from './modifiable';
+import { ModifiableSchema } from './modifiable.js';
 
 class UnknownSchema extends ModifiableSchema<unknown> {
   public override parse(obj: unknown): unknown {

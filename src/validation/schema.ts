@@ -1,5 +1,5 @@
-import { BodyType } from './body';
-import { Issue, ValidationError } from './error';
+import { BodyType } from './body.js';
+import { Issue, ValidationError } from './error.js';
 
 /**
  * The base class for all schemas.

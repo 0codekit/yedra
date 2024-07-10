@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { array } from './array';
-import { number } from './number';
-import { string } from './string';
+import { array } from './array.js';
+import { number } from './number.js';
+import { string } from './string.js';
 
 test('Validate Array', () => {
   const schema = array(number());

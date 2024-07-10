@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { boolean } from './boolean';
+import { boolean } from './boolean.js';
 
 test('Validate Boolean', () => {
   const schema = boolean();

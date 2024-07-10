@@ -1,6 +1,6 @@
 {
   "name": "yedra",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
@@ -19,7 +19,8 @@
     "check": "biome check src/*"
   },
   "types": "dist/index.d.ts",
+  "type": "module",
   "dependencies": {
-    "glob": "^10.4.5"
+    "glob": "^11.0.0"
   }
 }

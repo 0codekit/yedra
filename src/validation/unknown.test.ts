@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { unknown } from './unknown';
+import { unknown } from './unknown.js';
 
 test('Validate Unknown', () => {
   const schema = unknown();

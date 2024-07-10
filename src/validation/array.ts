@@ -1,7 +1,7 @@
-import type { Typeof } from './body';
-import { Issue, ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
-import type { Schema } from './schema';
+import type { Typeof } from './body.js';
+import { Issue, ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
+import type { Schema } from './schema.js';
 
 class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
   Typeof<ItemSchema>[]

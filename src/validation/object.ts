@@ -1,7 +1,7 @@
-import type { Typeof } from './body';
-import { Issue, ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
-import { Schema } from './schema';
+import type { Typeof } from './body.js';
+import { Issue, ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
+import { Schema } from './schema.js';
 
 /**
  * Make a union of all keys that are not extended by undefined

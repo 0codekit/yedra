@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { _enum } from './enum';
+import { _enum } from './enum.js';
 
 test('Validate Enum', () => {
   const schema = _enum(3, 4, 'hello');

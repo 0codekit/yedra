@@ -1,5 +1,5 @@
 import { isUint8Array } from 'node:util/types';
-import type { Log, Schema, Typeof } from '../lib';
+import type { Log, Schema, Typeof } from '../lib.js';
 
 /**
  * Indicates that the HTTP request failed. This can be

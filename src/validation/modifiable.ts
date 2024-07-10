@@ -1,5 +1,5 @@
-import { DocSchema } from './doc';
-import { Schema } from './schema';
+import { DocSchema } from './doc.js';
+import { Schema } from './schema.js';
 
 export abstract class ModifiableSchema<T> extends Schema<T> {
   /**

@@ -1,5 +1,5 @@
-import { Issue, ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
+import { Issue, ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
 
 class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
   T[number]

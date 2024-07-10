@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
-import { number } from './number';
-import { record } from './record';
+import { number } from './number.js';
+import { record } from './record.js';
 
 test('Validate Record', () => {
   const schema = record(number());

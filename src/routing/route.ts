@@ -1,12 +1,14 @@
 import { isUint8Array } from 'node:util/types';
-import { Http, Log, ValidationError } from '../lib';
-import type { BodyType, Typeof } from '../validation/body';
-import { type NoneBody, none } from '../validation/none';
-import { type ObjectSchema, object } from '../validation/object';
-import type { Schema } from '../validation/schema';
-import type { Endpoint } from './app';
-import { BadRequestError } from './errors';
-import { Path } from './path';
+import type { BodyType, Typeof } from '../validation/body.js';
+import { type NoneBody, none } from '../validation/none.js';
+import { type ObjectSchema, object } from '../validation/object.js';
+import type { Schema } from '../validation/schema.js';
+import type { Endpoint } from './app.js';
+import { BadRequestError } from './errors.js';
+import { Path } from './path.js';
+import { Log } from './log.js';
+import { Http } from './http.js';
+import { ValidationError } from '../validation/error.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
   log: Log;

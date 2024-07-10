@@ -1,6 +1,6 @@
 import { isDate } from 'node:util/types';
-import { Issue, ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
+import { Issue, ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
 
 class DateSchema extends ModifiableSchema<Date> {
   public override parse(obj: unknown): Date {

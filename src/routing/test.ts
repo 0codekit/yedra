@@ -1,7 +1,7 @@
 import { isUint8Array } from 'node:util/types';
-import { App } from './app';
-import { Http, HttpRequestError, HttpResponse } from './http';
-import { Log } from './log';
+import { App } from './app.js';
+import { Http, HttpRequestError, HttpResponse } from './http.js';
+import { Log } from './log.js';
 
 export class TestService {
   private target: string | App;

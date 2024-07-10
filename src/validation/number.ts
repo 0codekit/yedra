@@ -1,5 +1,5 @@
-import { Issue, ValidationError } from './error';
-import { ModifiableSchema } from './modifiable';
+import { Issue, ValidationError } from './error.js';
+import { ModifiableSchema } from './modifiable.js';
 
 class NumberSchema extends ModifiableSchema<number> {
   private readonly minValue?: number;

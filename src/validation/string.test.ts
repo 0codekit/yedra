@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { string } from './string';
+import { string } from './string.js';
 
 test('Validate String', () => {
   const schema = string();

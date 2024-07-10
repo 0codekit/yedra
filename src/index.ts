@@ -1,2 +1,2 @@
-import * as y from './lib';
+import * as y from './lib.js';
 export { y };

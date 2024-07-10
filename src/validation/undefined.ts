@@ -1,5 +1,5 @@
-import { Issue, ValidationError } from './error';
-import { Schema } from './schema';
+import { Issue, ValidationError } from './error.js';
+import { Schema } from './schema.js';
 
 export class UndefinedSchema extends Schema<undefined> {
   public override parse(obj: unknown): undefined {

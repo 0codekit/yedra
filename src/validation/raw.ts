@@ -1,4 +1,4 @@
-import { BodyType } from './body';
+import { BodyType } from './body.js';
 
 class RawBody extends BodyType<Uint8Array> {
   private contentType: string;

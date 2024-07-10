@@ -1,12 +1,12 @@
 import { isUint8Array } from 'node:util/types';
-import type { BodyType, Typeof } from '../validation/body';
-import { ValidationError } from '../validation/error';
-import type { Schema } from '../validation/schema';
-import type { Endpoint } from './app';
-import { BadRequestError } from './errors';
-import { Http } from './http';
-import { Log } from './log';
-import { Path } from './path';
+import type { BodyType, Typeof } from '../validation/body.js';
+import { ValidationError } from '../validation/error.js';
+import type { Schema } from '../validation/schema.js';
+import type { Endpoint } from './app.js';
+import { BadRequestError } from './errors.js';
+import { Http } from './http.js';
+import { Log } from './log.js';
+import { Path } from './path.js';
 
 export type EndpointRequest<Query, Headers, Req> = {
   log: Log;
