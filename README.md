@@ -1,4 +1,4 @@
-# @wemakefuture/y
+# yedra
 
 ## Table Of Contents
 
@@ -14,60 +14,21 @@
 
 ## Introduction
 
-y is a simple web framework for TypeScript. It includes a validation library
-similar to Zod, and a simple route system similar to express. y is very
-opinionated and not suitable for all use cases, e.g. since it doesn't provide
-good support for custom middleware or data formats other than JSON.
-
-Instead, it makes it easy to build well-documented software: y supports
-automatic generation of OpenAPI documentation for all endpoints. This includes
-generating JSON schemas for all request and response bodies that are specified
-using y schemas.
+yedra is a web framework for TypeScript. It includes a validation library
+similar to Zod, and a simple route system similar to express. yedra's primary
+goal is to make it easy to build well-documented software: it supports automatic
+generation of OpenAPI documentation for all endpoints, and generating JSON
+schemas for all request and response bodies that are specified using schemas.
 
 ## Getting Started
 
-First, install y with your favorite package manager:
+To create a yedra project, run:
 
 ```bash
-npm install @wemakefuture/y
-yarn add @wemakefuture/y
-bun add @wemakefuture/y
+bun create yedra@latest my-project
+yarn create yedra@latest my-project
+npm create yedra@latest my-project
 ```
-
-Then, create your first endpoint in `src/routes/up.ts`:
-
-```ts
-import { y } from "@wemakefuture/y";
-
-export default y.endpoint("/up", {
-  summary: "Get server status.",
-  method: "GET",
-  query: y.object({}),
-  headers: y.object({}),
-  req: y.object({}),
-  res: y.object({ message: y.string() }),
-  do(req) {
-    return {
-      body: {
-        message: "Healthy.",
-      },
-    };
-  },
-});
-```
-
-And add this to `src/index.ts`:
-
-```ts
-import { y } from "@wemakefuture/y";
-
-y.app(`${__dirname}/routes`).then((app) => {
-  app.listen(3000);
-});
-```
-
-This starts a server with all endpoints in `src/routes` and listens on
-port 3000.
 
 ## Endpoints
 
@@ -292,7 +253,8 @@ y generally tries to follow a semantic versioning model. Right now, y is
 pre-1.0, so breaking changes can occur on every minor release.
 
 - 0.8.0 - Removed `identity` encoding, changed error field to `errorMessage`
-- 0.7.3 - Changed `accept-encoding` for `y.Http` to `identity` to prevent memory leak
+- 0.7.3 - Changed `accept-encoding` for `y.Http` to `identity` to prevent memory
+  leak
 - 0.7.2 - Added time and connection count to connection log
 - 0.7.1 - Made headers on test service methods optional
 - 0.7.0 - Added test service and env parser
@@ -324,3 +286,7 @@ pre-1.0, so breaking changes can occur on every minor release.
 - 0.1.2 - Fixed y.number() minimum and maximum checks
 - 0.1.1 - Added test cases, documentation and license
 - 0.1.0 - Initial release
+
+```
+
+```
