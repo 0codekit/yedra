@@ -104,7 +104,7 @@ export const listen = (app: App, port: number): Context => {
   });
   const context = new ConcreteContext(server);
   server.listen(port, () => {
-    console.info(`y listening on localhost:${port}...`);
+    console.info(`yedra listening on localhost:${port}...`);
   });
   return context;
 };

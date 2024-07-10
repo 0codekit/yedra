@@ -9,6 +9,9 @@ import { BadRequestError } from './errors';
 import { Path } from './path';
 
 type ReqObject<Params, Query, Headers, Body> = {
+  log: Log;
+  http: Http;
+  url: string;
   params: Params;
   query: Query;
   headers: Headers;
@@ -144,6 +147,9 @@ class Route<Params extends (Schema<string> | Schema<number>)[]> {
         const log = new Log();
         const http = new Http(log);
         const response = await options.do({
+          log,
+          http,
+          url: req.url,
           params: parsedParams,
           query,
           headers,
