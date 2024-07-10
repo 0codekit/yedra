@@ -1,7 +1,7 @@
 {
-  "name": "@wemakefuture/y",
-  "version": "0.8.0",
-  "repository": "github:wemakefuture/y",
+  "name": "yedra",
+  "version": "0.9.0",
+  "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
     "@biomejs/biome": "^1.7.3",
@@ -9,11 +9,12 @@
     "@types/node": "^20.12.13",
     "typescript": "^5.4.5"
   },
-  "bugs": "https://github.com/wemakefuture/y/issues",
+  "bugs": "https://github.com/0codekit/yedra/issues",
   "contributors": ["Justus Zorn <jzorn@wemakefuture.com>"],
   "description": "A TypeScript web framework with OpenAPI generation.",
   "keywords": ["typescript", "web", "http", "schema", "validation", "openapi"],
   "license": "MIT",
+  "files": ["./dist/*"],
   "scripts": {
     "check": "biome check src/*"
   },

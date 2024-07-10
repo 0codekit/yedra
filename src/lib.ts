@@ -24,6 +24,7 @@ export const validatePath = (path: string) => {
 };
 export { TestService } from './routing/test';
 export { parseEnv } from './routing/env';
+export { route } from './routing/route';
 
 // validation
 export { array } from './validation/array';
@@ -38,6 +39,7 @@ export { record } from './validation/record';
 export { Schema } from './validation/schema';
 export { BodyType, type Typeof } from './validation/body';
 export { raw } from './validation/raw';
+export { none } from './validation/none';
 export { either } from './validation/either';
 export { HttpResponse, HttpRequestError, Http } from './routing/http';
 export { string } from './validation/string';

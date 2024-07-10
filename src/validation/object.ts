@@ -16,11 +16,11 @@ type RequiredKeys<T> = {
  */
 type MakeFieldsOptional<T> = Pick<T, RequiredKeys<T>> & Partial<T>;
 
-export class ObjectSchema<Shape> extends ModifiableSchema<
+export class ObjectSchema<
+  Shape extends Record<string, Schema<unknown>>,
+> extends ModifiableSchema<
   MakeFieldsOptional<{
-    [K in keyof Shape]: Shape[K] extends Schema<unknown>
-      ? Typeof<Shape[K]>
-      : never;
+    [K in keyof Shape]: Typeof<Shape[K]>;
   }>
 > {
   private shape: Shape;
@@ -31,9 +31,7 @@ export class ObjectSchema<Shape> extends ModifiableSchema<
   }
 
   public override parse(obj: unknown): MakeFieldsOptional<{
-    [K in keyof Shape]: Shape[K] extends Schema<unknown>
-      ? Typeof<Shape[K]>
-      : never;
+    [K in keyof Shape]: Typeof<Shape[K]>;
   }> {
     if (typeof obj !== 'object') {
       throw new ValidationError([
@@ -46,9 +44,7 @@ export class ObjectSchema<Shape> extends ModifiableSchema<
       ]);
     }
     const result = {} as {
-      [K in keyof Shape]: Shape[K] extends Schema<unknown>
-        ? Typeof<Shape[K]>
-        : never;
+      [K in keyof Shape]: Typeof<Shape[K]>;
     };
     const issues: Issue[] = [];
     for (const prop in this.shape) {
@@ -105,5 +101,6 @@ export class ObjectSchema<Shape> extends ModifiableSchema<
  * type SchemaType = y.Typeof<typeof schema>; // { num: number, str?: string }
  * ```
  */
-export const object = <Shape>(shape: Shape): ObjectSchema<Shape> =>
-  new ObjectSchema(shape);
+export const object = <Shape extends Record<string, Schema<unknown>>>(
+  shape: Shape,
+): ObjectSchema<Shape> => new ObjectSchema(shape);
