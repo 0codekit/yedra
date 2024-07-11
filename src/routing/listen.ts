@@ -85,11 +85,8 @@ export const listen = (app: App, port: number): Context => {
     req.on('end', async () => {
       const body = Buffer.concat(chunks);
       const url = new URL(req.url ?? '', `http://${req.headers.host}`);
-      console.info(
-        `[${new Date().toISOString()}] ${req.method} ${
-          url.pathname
-        } (${context.connectionCount()} connections)`,
-      );
+      const begin = Date.now();
+      const concurrentConnections = context.connectionCount();
       const response = await app.handle({
         method: req.method ?? 'GET',
         url: url.pathname,
@@ -97,6 +94,13 @@ export const listen = (app: App, port: number): Context => {
         headers: parseHeaders(req.headers),
         body,
       });
+      const duration = Date.now() - begin;
+      console.info(
+        `[${new Date().toISOString()}] ${req.method} ${
+          url.pathname
+        } -> ${response.status} [${duration}ms, ${concurrentConnections}cc]`,
+      );
+
       res.writeHead(response.status, response.headers);
       res.end(response.body);
       removeConn();
