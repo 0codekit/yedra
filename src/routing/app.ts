@@ -115,15 +115,15 @@ export class App {
       | { endpoint: Endpoint; params: Record<string, string>; score: number }
       | undefined = undefined;
     for (const endpoint of this.endpoints) {
-      const params = endpoint.path.match(url);
-      if (!params) {
+      const match = endpoint.path.match(url);
+      if (match === undefined) {
         continue;
       }
+      const { params, score } = match;
       if (endpoint.method !== method) {
         invalidMethod = true;
         continue;
       }
-      const score = Object.keys(params).length;
       const previous = result?.score;
       if (previous === undefined || score < previous) {
         // if there was no previous match or this one is better, use it
