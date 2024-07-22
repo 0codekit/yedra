@@ -1,7 +1,7 @@
 import { BodyType } from './body.js';
 
-export class NoneBody extends BodyType<void> {
-  public deserialize(buffer: Uint8Array, contentType: string): void {
+export class NoneBody extends BodyType<undefined> {
+  public deserialize(buffer: Uint8Array, contentType: string): undefined {
     return;
   }
 
