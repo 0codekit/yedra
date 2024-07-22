@@ -166,7 +166,7 @@ class Route<Params extends (Schema<string> | Schema<number>)[]> {
         }
         return {
           status: response.status ?? 200,
-          body: Buffer.from(JSON.stringify(response.body)),
+          body: Buffer.from(JSON.stringify(response.body) ?? ''),
           headers: {
             'content-type': 'application/json',
             ...response.headers,
