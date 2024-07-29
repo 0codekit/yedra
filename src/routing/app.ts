@@ -93,7 +93,16 @@ export class App {
     Bun.serve<{ handler: WebSocketHandler }>({
       port: port,
       fetch: async (req, server) => {
-        return await this.handle(req, server);
+        const url = new URL(req.url).pathname;
+        const begin = Date.now();
+        const response = await this.handle(req, server);
+        const duration = Date.now() - begin;
+        if (response !== undefined) {
+          console.log(
+            `[${new Date().toISOString()}] ${req.method} ${url} -> ${response.status} (${duration}ms)`,
+          );
+        }
+        return response;
       },
       websocket: {
         async open(ws) {
@@ -107,6 +116,7 @@ export class App {
         },
       },
     });
+    console.log(`yedra listening on http://localhost:${port}...`);
   }
 
   private static errorResponse(status: number, errorMessage: string) {
