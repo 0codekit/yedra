@@ -2,12 +2,6 @@ import { Path } from './routing/path.js';
 
 // routing
 export {
-  type EndpointOptions,
-  type EndpointRequest,
-  type EndpointResponse,
-  endpoint,
-} from './routing/endpoint.js';
-export {
   HttpError,
   BadRequestError,
   UnauthorizedError,
@@ -16,15 +10,14 @@ export {
   NotFoundError,
   ConflictError,
 } from './routing/errors.js';
-export { type Context } from './routing/listen.js';
 export { Log } from './routing/log.js';
 export { type Endpoint, app } from './routing/app.js';
 export const validatePath = (path: string) => {
   new Path(path);
 };
-export { TestService } from './routing/test.js';
 export { parseEnv } from './routing/env.js';
-export { route } from './routing/route.js';
+
+export { get, post, put, del, ws } from './routing/endpoints.js';
 
 // validation
 export { array } from './validation/array.js';

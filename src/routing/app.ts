@@ -1,28 +1,19 @@
 import { glob } from 'glob';
 import { HttpError } from './errors.js';
-import { type Context, listen } from './listen.js';
 import type { Path } from './path.js';
+import type { Server } from 'bun';
+import type { WebSocketHandler } from './endpoints.js';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
-
-type HttpReq = {
-  method: string;
-  url: string;
-  query: Record<string, string | undefined>;
-  headers: Record<string, string | undefined>;
-  body: Uint8Array;
-};
-
-type HttpRes = {
-  status: number;
-  body: Uint8Array;
-  headers: Record<string, string>;
-};
 
 export type Endpoint = {
   method: Method;
   path: Path;
-  handle: (req: HttpReq, params: Record<string, string>) => Promise<HttpRes>;
+  handle: (
+    req: Request,
+    params: Record<string, string>,
+    server: Server,
+  ) => Promise<Response | undefined>;
   documentation: () => object;
 };
 
@@ -38,7 +29,11 @@ export class App {
    * @param req - The HTTP request.
    * @returns The HTTP response.
    */
-  public async handle(req: HttpReq): Promise<HttpRes> {
+  public async handle(
+    req: Request,
+    server: Server,
+  ): Promise<Response | undefined> {
+    const url = new URL(req.url).pathname;
     if (
       req.method !== 'GET' &&
       req.method !== 'POST' &&
@@ -47,18 +42,22 @@ export class App {
     ) {
       return App.errorResponse(405, `Method '${req.method}' not allowed.`);
     }
-    const match = this.matchEndpoint(req.url, req.method);
+    const match = this.matchEndpoint(url, req.method);
     if (!match.result) {
       if (match.invalidMethod) {
         return App.errorResponse(
           405,
-          `Method '${req.method}' not allowed for path '${req.url}'.`,
+          `Method '${req.method}' not allowed for path '${url}'.`,
         );
       }
-      return App.errorResponse(404, `Path '${req.url}' not found.`);
+      return App.errorResponse(404, `Path '${url}' not found.`);
     }
     try {
-      return await match.result.endpoint.handle(req, match.result.params);
+      return await match.result.endpoint.handle(
+        req,
+        match.result.params,
+        server,
+      );
     } catch (error) {
       if (error instanceof HttpError) {
         return App.errorResponse(error.status, error.message);
@@ -90,23 +89,34 @@ export class App {
     };
   }
 
-  public listen(port: number): Context {
-    return listen(this, port);
+  public listen(port: number) {
+    Bun.serve<{ handler: WebSocketHandler }>({
+      port: port,
+      fetch: this.handle,
+      websocket: {
+        async open(ws) {
+          ws.data.handler.open(ws);
+        },
+        async message(ws, message) {
+          ws.data.handler.message(Buffer.from(message));
+        },
+        async close(ws, code, reason) {
+          ws.data.handler.close(code, reason);
+        },
+      },
+    });
   }
 
   private static errorResponse(status: number, errorMessage: string) {
-    return {
-      status,
-      body: Buffer.from(
-        JSON.stringify({
-          status,
-          errorMessage,
-        }),
-      ),
-      headers: {
-        'content-type': 'application/json',
+    return Response.json(
+      {
+        status,
+        errorMessage,
       },
-    };
+      {
+        status,
+      },
+    );
   }
 
   private matchEndpoint(url: string, method: Method) {
