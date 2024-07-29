@@ -92,7 +92,9 @@ export class App {
   public listen(port: number) {
     Bun.serve<{ handler: WebSocketHandler }>({
       port: port,
-      fetch: this.handle,
+      fetch: async (req, server) => {
+        return await this.handle(req, server);
+      },
       websocket: {
         async open(ws) {
           ws.data.handler.open(ws);

@@ -299,6 +299,9 @@ type WebSocketOptions<
   Params extends Record<string, Schema<string> | Schema<number>>,
   Query extends Record<string, Schema<string> | Schema<number>>,
 > = {
+  category: string;
+  summary: string;
+  description?: string;
   params: Params;
   query: Query;
   do: (
