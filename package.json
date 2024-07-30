@@ -1,6 +1,6 @@
 {
   "name": "yedra",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
@@ -21,6 +21,8 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "dependencies": {
-    "glob": "^11.0.0"
+    "@types/uuid": "^10.0.0",
+    "glob": "^11.0.0",
+    "uuid": "^10.0.0"
   }
 }
