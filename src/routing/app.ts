@@ -1,7 +1,7 @@
 import { glob } from 'glob';
 import { HttpError } from './errors.js';
 import type { Path } from './path.js';
-import type { Server } from 'bun';
+import type { Server, ServerWebSocket } from 'bun';
 import type { WebSocketHandler } from './endpoints.js';
 
 export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -105,14 +105,18 @@ export class App {
         return response;
       },
       websocket: {
-        async open(ws) {
-          ws.data.handler.open(ws);
+        open(ws) {
+          App.handleWebSocketErrors(ws, () => ws.data.handler.open(ws));
         },
-        async message(ws, message) {
-          ws.data.handler.message(Buffer.from(message));
+        message(ws, message) {
+          App.handleWebSocketErrors(ws, () =>
+            ws.data.handler.message(Buffer.from(message)),
+          );
         },
-        async close(ws, code, reason) {
-          ws.data.handler.close(code, reason);
+        close(ws, code, reason) {
+          App.handleWebSocketErrors(ws, () =>
+            ws.data.handler.close(code, reason),
+          );
         },
       },
     });
@@ -129,6 +133,21 @@ export class App {
         status,
       },
     );
+  }
+
+  private static async handleWebSocketErrors(
+    ws: ServerWebSocket<{ handler: WebSocketHandler }>,
+    operation: () => Promise<void> | void,
+  ): Promise<void> {
+    try {
+      await operation();
+    } catch (error) {
+      if (error instanceof HttpError) {
+        ws.close(1000, error.message);
+      } else {
+        ws.close(1011, 'Internal Server Error');
+      }
+    }
   }
 
   private matchEndpoint(url: string, method: Method) {
