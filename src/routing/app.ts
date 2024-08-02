@@ -145,6 +145,7 @@ export class App {
       if (error instanceof HttpError) {
         ws.close(1000, error.message);
       } else {
+        console.error(error);
         ws.close(1011, 'Internal Server Error');
       }
     }
