@@ -3,7 +3,7 @@ import { Schema } from './schema.js';
 
 export class UndefinedSchema extends Schema<undefined> {
   public override parse(obj: unknown): undefined {
-    if (obj === undefined) {
+    if (obj === undefined || obj === null) {
       return undefined;
     }
     throw new ValidationError([
