@@ -33,9 +33,9 @@ type ResObject<Body> =
     };
 
 type EndpointOptions<
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
-  Headers extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
   Req extends BodyType<unknown>,
   Res extends BodyType<unknown>,
 > = {
@@ -58,9 +58,9 @@ type EndpointOptions<
 };
 
 const create = <
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
-  Headers extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
   Req extends BodyType<unknown>,
   Res extends BodyType<unknown>,
 >(
@@ -178,9 +178,9 @@ const paramDocs = <Params extends Record<string, Schema<unknown>>>(
 };
 
 export const get = <
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
-  Headers extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
   Res extends BodyType<unknown>,
 >(
   path: string,
@@ -188,9 +188,9 @@ export const get = <
 ): Endpoint => create('GET', path, { ...options, req: none() });
 
 export const post = <
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
-  Headers extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
   Req extends BodyType<unknown>,
   Res extends BodyType<unknown>,
 >(
@@ -199,9 +199,9 @@ export const post = <
 ): Endpoint => create('POST', path, options);
 
 export const put = <
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
-  Headers extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
   Req extends BodyType<unknown>,
   Res extends BodyType<unknown>,
 >(
@@ -211,9 +211,9 @@ export const put = <
 
 export const del = <
   Path extends string,
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
-  Headers extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
   Res extends BodyType<unknown>,
 >(
   path: Path,
@@ -296,8 +296,8 @@ class Socket {
 }
 
 type WebSocketOptions<
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
 > = {
   category: string;
   summary: string;
@@ -315,8 +315,8 @@ type WebSocketOptions<
 };
 
 export const ws = <
-  Params extends Record<string, Schema<string> | Schema<number>>,
-  Query extends Record<string, Schema<string> | Schema<number>>,
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
 >(
   path: string,
   options: WebSocketOptions<Params, Query>,
