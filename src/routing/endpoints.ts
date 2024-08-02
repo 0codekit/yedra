@@ -333,10 +333,21 @@ export const ws = <
       }
       const handler = new WebSocketHandler(async (ws) => {
         const socket = new Socket(handler, ws);
+        let parsedParams: Typeof<ObjectSchema<Params>>;
+        let parsedQuery: Typeof<ObjectSchema<Query>>;
+        try {
+          parsedParams = paramsSchema.parse(params);
+          parsedQuery = querySchema.parse(Object.fromEntries(url.searchParams));
+        } catch (error) {
+          if (error instanceof ValidationError) {
+            throw new BadRequestError(error.format());
+          }
+          throw error;
+        }
         await options.do(socket, {
           url: url.pathname,
-          params: paramsSchema.parse(params),
-          query: querySchema.parse(Object.fromEntries(url.searchParams)),
+          params: parsedParams,
+          query: parsedQuery,
         });
       });
       if (
