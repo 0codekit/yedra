@@ -14,7 +14,10 @@ export class App {
 
   public use(path: string, endpoint: Endpoint | App): App {
     if (endpoint instanceof App) {
-      this.routes.push(...endpoint.routes);
+      for (const route of endpoint.routes) {
+        const newPath = route.path.withPrefix(path);
+        this.routes.push({ path: newPath, endpoint: route.endpoint });
+      }
     } else {
       this.routes.push({ path: new Path(path), endpoint });
     }
