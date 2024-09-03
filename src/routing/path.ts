@@ -17,7 +17,10 @@ export class Path {
     if (!path.startsWith('/')) {
       throw new Error(`API path ${path} is invalid: Must start with '/'.`);
     }
-    this.expected = path.substring(1).split('/');
+    this.expected = path
+      .substring(1)
+      .split('/')
+      .filter((segment) => segment !== '');
     const invalidSegment = this.expected.find(
       (part) => part.match(/^((:?[a-z0-9-]+\??)|\*)$/) === null,
     );
