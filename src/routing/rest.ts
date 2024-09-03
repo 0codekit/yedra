@@ -78,7 +78,7 @@ class RestEndpoint<
   }
 
   public get method(): 'GET' | 'POST' | 'PUT' | 'DELETE' {
-    return this.method;
+    return this._method;
   }
 
   public async handle(
