@@ -1,27 +1,24 @@
-import { glob } from 'glob';
 import { HttpError } from './errors.js';
-import type { Path } from './path.js';
+import { Path } from './path.js';
 import type { Server, ServerWebSocket } from 'bun';
-import type { WebSocketHandler } from './endpoints.js';
+import type { Endpoint } from './endpoint.js';
+import type { WebSocketHandler } from './websocket.js';
 
-export type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
-
-export type Endpoint = {
-  method: Method;
+type Route = {
   path: Path;
-  handle: (
-    req: Request,
-    params: Record<string, string>,
-    server: Server,
-  ) => Promise<Response | undefined>;
-  documentation: () => object;
+  endpoint: Endpoint;
 };
 
 export class App {
-  private endpoints: Endpoint[];
+  private routes: Route[] = [];
 
-  public constructor(endpoints: Endpoint[]) {
-    this.endpoints = endpoints;
+  public use(path: string, endpoint: Endpoint | App): App {
+    if (endpoint instanceof App) {
+      this.routes.push(...endpoint.routes);
+    } else {
+      this.routes.push({ path: new Path(path), endpoint });
+    }
+    return this;
   }
 
   /**
@@ -75,10 +72,11 @@ export class App {
     servers: { description: string; url: string }[];
   }): object {
     const paths: Record<string, Record<string, object>> = {};
-    for (const endpoint of this.endpoints) {
-      const path = endpoint.path.toString();
+    for (const route of this.routes) {
+      const path = route.path.toString();
       const methods = paths[path] ?? {};
-      methods[endpoint.method.toLowerCase()] = endpoint.documentation();
+      methods[route.endpoint.method.toLowerCase()] =
+        route.endpoint.documentation();
       paths[path] = methods;
     }
     return {
@@ -151,60 +149,30 @@ export class App {
     }
   }
 
-  private matchEndpoint(url: string, method: Method) {
+  private matchEndpoint(
+    url: string,
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  ) {
     let invalidMethod = false;
     let result:
       | { endpoint: Endpoint; params: Record<string, string>; score: number }
       | undefined = undefined;
-    for (const endpoint of this.endpoints) {
-      const match = endpoint.path.match(url);
+    for (const route of this.routes) {
+      const match = route.path.match(url);
       if (match === undefined) {
         continue;
       }
       const { params, score } = match;
-      if (endpoint.method !== method) {
+      if (route.endpoint.method !== method) {
         invalidMethod = true;
         continue;
       }
       const previous = result?.score;
       if (previous === undefined || score < previous) {
         // if there was no previous match or this one is better, use it
-        result = { endpoint, params, score };
+        result = { endpoint: route.endpoint, params, score };
       }
     }
     return { invalidMethod, result };
   }
 }
-
-const shouldIgnore = (path: string): boolean => {
-  const extensions = [
-    '.test.ts',
-    '.schema.ts',
-    '.util.ts',
-    '.d.ts',
-    '.test.js',
-    '.schema.js',
-    '.util.js',
-  ];
-  for (const extension of extensions) {
-    if (path.endsWith(extension)) {
-      return true;
-    }
-  }
-  return false;
-};
-
-export const app = async (routes: string): Promise<App> => {
-  const endpoints: Endpoint[] = [];
-  const files = await glob([`${routes}/**/*.ts`, `${routes}/**/*.js`], {
-    absolute: true,
-  });
-  for (const file of files) {
-    if (shouldIgnore(file)) {
-      continue;
-    }
-    const endpoint = await import(file);
-    endpoints.push(endpoint.default);
-  }
-  return new App(endpoints);
-};
