@@ -1,20 +1,31 @@
 {
   "name": "yedra",
-  "version": "0.11.4",
+  "version": "0.11.5",
   "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
     "@biomejs/biome": "^1.8.3",
-    "@types/bun": "^1.1.6",
-    "@types/node": "^22.0.3",
+    "@types/bun": "^1.1.8",
+    "@types/node": "^22.5.3",
     "typescript": "^5.5.4"
   },
   "bugs": "https://github.com/0codekit/yedra/issues",
-  "contributors": ["Justus Zorn <jzorn@wemakefuture.com>"],
+  "contributors": [
+    "Justus Zorn <jzorn@wemakefuture.com>"
+  ],
   "description": "A TypeScript web framework with OpenAPI generation.",
-  "keywords": ["typescript", "web", "http", "schema", "validation", "openapi"],
+  "keywords": [
+    "typescript",
+    "web",
+    "http",
+    "schema",
+    "validation",
+    "openapi"
+  ],
   "license": "MIT",
-  "files": ["./dist/**"],
+  "files": [
+    "./dist/**"
+  ],
   "scripts": {
     "check": "biome check src/*"
   },

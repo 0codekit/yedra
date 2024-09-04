@@ -9,6 +9,23 @@ type Route = {
   endpoint: Endpoint;
 };
 
+class Context {
+  private server: Server;
+
+  public constructor(server: Server) {
+    this.server = server;
+  }
+
+  public async stop() {
+    // stop accepting new connections
+    this.server.stop();
+    // wait for current connections to be closed
+    while (this.server.pendingRequests > 0) {
+      await Bun.sleep(1000);
+    }
+  }
+}
+
 export class App {
   private routes: Route[] = [];
 
@@ -90,8 +107,8 @@ export class App {
     };
   }
 
-  public listen(port: number) {
-    Bun.serve<{ handler: WebSocketHandler }>({
+  public listen(port: number): Context {
+    const server = Bun.serve<{ handler: WebSocketHandler }>({
       port: port,
       fetch: async (req, server) => {
         const url = new URL(req.url).pathname;
@@ -122,6 +139,7 @@ export class App {
       },
     });
     console.log(`yedra listening on http://localhost:${port}...`);
+    return new Context(server);
   }
 
   private static errorResponse(status: number, errorMessage: string) {
