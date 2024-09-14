@@ -3,3 +3,12 @@ export { y };
 export { App } from './routing/app.js';
 export { Get, Post, Put, Delete } from './routing/rest.js';
 export { Ws } from './routing/websocket.js';
+export {
+  HttpError,
+  BadRequestError,
+  UnauthorizedError,
+  PaymentRequiredError,
+  ForbiddenError,
+  NotFoundError,
+  ConflictError,
+} from './routing/errors.js';

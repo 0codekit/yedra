@@ -117,7 +117,7 @@ export class App {
         const duration = Date.now() - begin;
         if (response !== undefined) {
           console.log(
-            `[${new Date().toISOString()}] ${req.method} ${url} -> ${response.status} (${duration}ms)`,
+            `${req.method} ${url} -> ${response.status} (${duration}ms)`,
           );
         }
         return response;
