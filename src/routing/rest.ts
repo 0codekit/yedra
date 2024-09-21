@@ -1,11 +1,11 @@
 import type { Server } from 'bun';
 import type { BodyType, Typeof } from '../validation/body.js';
-import { object, type ObjectSchema } from '../validation/object.js';
+import { ValidationError } from '../validation/error.js';
+import { NoneBody, none } from '../validation/none.js';
+import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
-import { ValidationError } from '../validation/error.js';
-import { none, NoneBody } from '../validation/none.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
   url: string;

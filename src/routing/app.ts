@@ -1,7 +1,7 @@
-import { HttpError } from './errors.js';
-import { Path } from './path.js';
 import type { Server, ServerWebSocket } from 'bun';
 import type { Endpoint } from './endpoint.js';
+import { HttpError } from './errors.js';
+import { Path } from './path.js';
 import type { WebSocketHandler } from './websocket.js';
 
 type Route = {
@@ -26,11 +26,11 @@ class Context {
   }
 }
 
-export class App {
+export class Yedra {
   private routes: Route[] = [];
 
-  public use(path: string, endpoint: Endpoint | App): App {
-    if (endpoint instanceof App) {
+  public use(path: string, endpoint: Endpoint | Yedra): Yedra {
+    if (endpoint instanceof Yedra) {
       for (const route of endpoint.routes) {
         const newPath = route.path.withPrefix(path);
         this.routes.push({ path: newPath, endpoint: route.endpoint });
@@ -57,17 +57,17 @@ export class App {
       req.method !== 'PUT' &&
       req.method !== 'DELETE'
     ) {
-      return App.errorResponse(405, `Method '${req.method}' not allowed.`);
+      return Yedra.errorResponse(405, `Method '${req.method}' not allowed.`);
     }
     const match = this.matchEndpoint(url, req.method);
     if (!match.result) {
       if (match.invalidMethod) {
-        return App.errorResponse(
+        return Yedra.errorResponse(
           405,
           `Method '${req.method}' not allowed for path '${url}'.`,
         );
       }
-      return App.errorResponse(404, `Path '${url}' not found.`);
+      return Yedra.errorResponse(404, `Path '${url}' not found.`);
     }
     try {
       return await match.result.endpoint.handle(
@@ -77,10 +77,10 @@ export class App {
       );
     } catch (error) {
       if (error instanceof HttpError) {
-        return App.errorResponse(error.status, error.message);
+        return Yedra.errorResponse(error.status, error.message);
       }
       console.error(error);
-      return App.errorResponse(500, 'Internal Server Error.');
+      return Yedra.errorResponse(500, 'Internal Server Error.');
     }
   }
 
@@ -124,15 +124,15 @@ export class App {
       },
       websocket: {
         open(ws) {
-          App.handleWebSocketErrors(ws, () => ws.data.handler.open(ws));
+          Yedra.handleWebSocketErrors(ws, () => ws.data.handler.open(ws));
         },
         message(ws, message) {
-          App.handleWebSocketErrors(ws, () =>
+          Yedra.handleWebSocketErrors(ws, () =>
             ws.data.handler.message(Buffer.from(message)),
           );
         },
         close(ws, code, reason) {
-          App.handleWebSocketErrors(ws, () =>
+          Yedra.handleWebSocketErrors(ws, () =>
             ws.data.handler.close(code, reason),
           );
         },

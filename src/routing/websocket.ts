@@ -1,10 +1,10 @@
 import type { Server, ServerWebSocket } from 'bun';
-import type { Schema } from '../validation/schema.js';
-import { object, type ObjectSchema } from '../validation/object.js';
 import type { Typeof } from '../validation/body.js';
+import { ValidationError } from '../validation/error.js';
+import { type ObjectSchema, object } from '../validation/object.js';
+import type { Schema } from '../validation/schema.js';
 import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
-import { ValidationError } from '../validation/error.js';
 
 type OpenCb = (
   ws: ServerWebSocket<{ handler: WebSocketHandler }>,
