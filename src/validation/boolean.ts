@@ -3,6 +3,12 @@ import { ModifiableSchema } from './modifiable.js';
 
 class BooleanSchema extends ModifiableSchema<boolean> {
   public override parse(obj: unknown): boolean {
+    if (obj === 'true') {
+      return true;
+    }
+    if (obj === 'false') {
+      return false;
+    }
     if (typeof obj !== 'boolean') {
       throw new ValidationError([
         new Issue('invalidType', [], 'boolean', typeof obj),
