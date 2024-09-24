@@ -31,7 +31,6 @@ export { BodyType, type Typeof } from './validation/body.js';
 export { raw } from './validation/raw.js';
 export { either } from './validation/either.js';
 export { string } from './validation/string.js';
-export { _undefined as undefined } from './validation/undefined.js';
 export { union } from './validation/union.js';
 export { unknown } from './validation/unknown.js';
 export { uuid } from './validation/uuid.js';

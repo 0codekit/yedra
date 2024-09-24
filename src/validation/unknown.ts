@@ -6,9 +6,7 @@ class UnknownSchema extends ModifiableSchema<unknown> {
   }
 
   public override documentation(): object {
-    return {
-      type: 'object',
-    };
+    return {};
   }
 }
 
