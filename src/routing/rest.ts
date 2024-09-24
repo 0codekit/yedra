@@ -140,10 +140,13 @@ class RestEndpoint<
       summary: this.options.summary,
       description: this.options.description,
       parameters,
-      requestBody: {
-        required: this.options.req instanceof NoneBody,
-        content: this.options.req.bodyDocs(),
-      },
+      requestBody:
+        this.options.req instanceof NoneBody
+          ? undefined
+          : {
+              required: true,
+              content: this.options.req.bodyDocs(),
+            },
       responses: {
         '200': {
           description: 'Success',

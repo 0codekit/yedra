@@ -29,7 +29,6 @@ export { record } from './validation/record.js';
 export { Schema } from './validation/schema.js';
 export { BodyType, type Typeof } from './validation/body.js';
 export { raw } from './validation/raw.js';
-export { none } from './validation/none.js';
 export { either } from './validation/either.js';
 export { string } from './validation/string.js';
 export { _undefined as undefined } from './validation/undefined.js';
