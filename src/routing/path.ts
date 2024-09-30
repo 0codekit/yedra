@@ -47,13 +47,12 @@ export class Path {
   }
 
   /**
-   * Prepends this path with another path. This is equivalent to
-   * `new Path(prefix + path.toString()).
+   * Prepends this path with another path.
    * @param prefix - The prefix to prepend.
    * @returns The prefixed path.
    */
   public withPrefix(prefix: string): Path {
-    return new Path(prefix + this.toString());
+    return new Path(`${prefix}/${this.expected.join('/')}`);
   }
 
   /**
@@ -62,7 +61,7 @@ export class Path {
    * @returns The path as a string.
    */
   public toString(): string {
-    return `/${this.expected.join('/')}`;
+    return `/${this.expected.map((segment) => (segment.startsWith(':') ? `{${segment.substring(1)}}` : segment)).join('/')}`;
   }
 
   /**

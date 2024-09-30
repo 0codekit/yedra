@@ -27,7 +27,7 @@ test('Path Simple', () => {
 
 test('Path With Parameter', () => {
   const path = new Path('/abc/:id');
-  expect(path.toString()).toStrictEqual('/abc/:id');
+  expect(path.toString()).toStrictEqual('/abc/{id}');
   expect(path.match('/abc/test/def')).toBeUndefined();
   expect(path.match('/abc/test')).toStrictEqual({
     params: {
@@ -53,7 +53,7 @@ test('Path With Prefix', () => {
 test('Path With Prefix And Parameter', () => {
   const path = new Path('/abc');
   const prefixed = path.withPrefix('/:id');
-  expect(prefixed.toString()).toStrictEqual('/:id/abc');
+  expect(prefixed.toString()).toStrictEqual('/{id}/abc');
   expect(prefixed.match('/37/abc')).toStrictEqual({
     params: {
       id: '37',
@@ -80,7 +80,7 @@ test('Path With Optional Segment', () => {
 
 test('Path With Optional Parameter', () => {
   const path = new Path('/abc/:id?');
-  expect(path.toString()).toStrictEqual('/abc/:id?');
+  expect(path.toString()).toStrictEqual('/abc/{id?}');
   expect(path.match('/abc')).toStrictEqual({
     params: {},
     score: 0,

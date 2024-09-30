@@ -5,17 +5,8 @@ test('Validate Enum', () => {
   const schema = _enum(3, 4, 'hello');
   expect(schema.isOptional()).toBeFalse();
   expect(schema.documentation()).toStrictEqual({
-    anyOf: [
-      {
-        const: 3,
-      },
-      {
-        const: 4,
-      },
-      {
-        const: 'hello',
-      },
-    ],
+    type: 'string',
+    enum: [3, 4, 'hello'],
   });
   expect(schema.parse(3)).toStrictEqual(3);
   expect(schema.parse(4)).toStrictEqual(4);
