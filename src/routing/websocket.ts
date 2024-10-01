@@ -5,6 +5,7 @@ import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
+import { paramDocs } from '../util/docs.js';
 
 type OpenCb = (
   ws: ServerWebSocket<{ handler: WebSocketHandler }>,
@@ -162,7 +163,40 @@ export class Ws<
   }
 
   public documentation(): object {
-    // TODO
-    return {};
+    const parameters = [
+      ...paramDocs(this.options.params, 'path'),
+      ...paramDocs(this.options.query, 'query'),
+    ];
+    return {
+      tags: [this.options.category],
+      summary: this.options.summary,
+      description: this.options.description,
+      parameters,
+      responses: {
+        '101': {
+          description: 'Switching to WebSocket',
+        },
+        '400': {
+          description: 'Upgrading to WebSocket failed',
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  status: {
+                    type: 'number',
+                    example: 400,
+                  },
+                  errorMessage: {
+                    type: 'string',
+                    example: 'Upgrading to WebSocket failed.',
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
   }
 }

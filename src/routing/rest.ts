@@ -6,6 +6,7 @@ import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
+import { paramDocs } from '../util/docs.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
   url: string;
@@ -234,21 +235,3 @@ export class Delete<
     super('DELETE', { req: none(), ...options });
   }
 }
-
-const paramDocs = <Params extends Record<string, Schema<unknown>>>(
-  params: Params,
-  position: string,
-): object[] => {
-  const result: object[] = [];
-  for (const name in params) {
-    const docs = params[name].documentation();
-    result.push({
-      name,
-      in: position,
-      description: 'description' in docs ? docs.description : undefined,
-      required: !params[name].isOptional(),
-      schema: docs,
-    });
-  }
-  return result;
-};
