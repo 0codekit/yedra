@@ -1,4 +1,4 @@
-import { Issue, ValidationError } from './error.js';
+import { ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 import type { Schema } from './schema.js';
 

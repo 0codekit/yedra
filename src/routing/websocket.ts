@@ -1,11 +1,11 @@
 import type { Server, ServerWebSocket } from 'bun';
+import { paramDocs } from '../util/docs.js';
 import type { Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
 import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
-import { paramDocs } from '../util/docs.js';
 
 type OpenCb = (
   ws: ServerWebSocket<{ handler: WebSocketHandler }>,
@@ -120,7 +120,7 @@ export class Ws<
     return 'GET';
   }
 
-  public async handle(
+  public handle(
     req: Request,
     params: Record<string, string>,
     server: Server,
@@ -159,7 +159,7 @@ export class Ws<
     ) {
       throw new BadRequestError('Upgrading to WebSocket failed.');
     }
-    return undefined;
+    return Promise.resolve(undefined);
   }
 
   public documentation(): object {

@@ -8,7 +8,7 @@ class RawBody extends BodyType<Uint8Array> {
     this.contentType = contentType ?? 'application/octet-stream';
   }
 
-  public deserialize(buffer: Uint8Array, contentType: string) {
+  public deserialize(buffer: Uint8Array, _contentType: string) {
     return buffer;
   }
 

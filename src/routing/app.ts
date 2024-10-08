@@ -9,20 +9,38 @@ type Route = {
   endpoint: Endpoint;
 };
 
-class Context {
-  private server: Server;
+class Counter {
+  private count = 0;
 
-  public constructor(server: Server) {
-    this.server = server;
+  public increment(): void {
+    this.count += 1;
   }
 
-  public async stop() {
+  public decrement(): void {
+    this.count -= 1;
+  }
+
+  public async wait(): Promise<void> {
+    while (this.count > 0) {
+      await Bun.sleep(1000);
+    }
+  }
+}
+
+class Context {
+  private server: Server;
+  private counter: Counter;
+
+  public constructor(server: Server, counter: Counter) {
+    this.server = server;
+    this.counter = counter;
+  }
+
+  public async stop(): Promise<void> {
     // stop accepting new connections
     this.server.stop();
     // wait for current connections to be closed
-    while (this.server.pendingRequests > 0) {
-      await Bun.sleep(1000);
-    }
+    await this.counter.wait();
   }
 }
 
@@ -108,9 +126,11 @@ export class Yedra {
   }
 
   public listen(port: number): Context {
+    const counter = new Counter();
     const server = Bun.serve<{ handler: WebSocketHandler }>({
       port: port,
       fetch: async (req, server) => {
+        counter.increment();
         const url = new URL(req.url).pathname;
         const begin = Date.now();
         const response = await this.handle(req, server);
@@ -120,6 +140,7 @@ export class Yedra {
             `${req.method} ${url} -> ${response.status} (${duration}ms)`,
           );
         }
+        counter.decrement();
         return response;
       },
       websocket: {
@@ -139,7 +160,7 @@ export class Yedra {
       },
     });
     console.log(`yedra listening on http://localhost:${port}...`);
-    return new Context(server);
+    return new Context(server, counter);
   }
 
   private static errorResponse(status: number, errorMessage: string) {

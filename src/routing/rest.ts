@@ -1,4 +1,5 @@
 import type { Server } from 'bun';
+import { paramDocs } from '../util/docs.js';
 import type { BodyType, Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
@@ -6,7 +7,6 @@ import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
-import { paramDocs } from '../util/docs.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
   url: string;
