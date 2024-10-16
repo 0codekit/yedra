@@ -1,14 +1,14 @@
 {
   "name": "yedra",
-  "version": "0.12.7",
+  "version": "0.12.8",
   "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
     "@biomejs/biome": "^1.9.3",
-    "@types/bun": "^1.1.10",
+    "@types/bun": "^1.1.11",
     "@types/node": "^22.7.5",
     "@types/uuid": "^10.0.0",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.3"
   },
   "bugs": "https://github.com/0codekit/yedra/issues",
   "contributors": ["Justus Zorn <jzorn@wemakefuture.com>"],
