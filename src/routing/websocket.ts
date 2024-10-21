@@ -1,68 +1,37 @@
-import type { Server, ServerWebSocket } from 'bun';
 import { paramDocs } from '../util/docs.js';
 import type { Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
 import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
-import type { Endpoint } from './endpoint.js';
 import { BadRequestError } from './errors.js';
+import type { WebSocket as NodeWebSocket } from 'ws';
 
-type OpenCb = (
-  ws: ServerWebSocket<{ handler: WebSocketHandler }>,
-) => Promise<void> | void;
 type MessageCb = (message: Buffer) => Promise<void> | void;
 type CloseCb = (
   code: number | undefined,
   reason: string | undefined,
 ) => Promise<void> | void;
 
-export class WebSocketHandler {
-  public open: OpenCb;
-  public messageCbs: MessageCb[] = [];
-  public closeCbs: CloseCb[] = [];
+class YedraWebSocket {
+  private ws: NodeWebSocket;
 
-  public constructor(open: OpenCb) {
-    this.open = open;
-  }
-
-  public async message(message: Buffer) {
-    for (const cb of this.messageCbs) {
-      await cb(message);
-    }
-  }
-
-  public async close(code: number | undefined, reason: string | undefined) {
-    for (const cb of this.closeCbs) {
-      await cb(code, reason);
-    }
-  }
-}
-
-class Socket {
-  private handler: WebSocketHandler;
-  private ws: ServerWebSocket<{ handler: WebSocketHandler }>;
-
-  public constructor(
-    handler: WebSocketHandler,
-    ws: ServerWebSocket<{ handler: WebSocketHandler }>,
-  ) {
-    this.handler = handler;
+  public constructor(ws: NodeWebSocket) {
     this.ws = ws;
   }
 
   public set onmessage(cb: MessageCb) {
-    this.handler.messageCbs.push(cb);
+    this.ws.on('message', cb);
   }
 
   public set onclose(cb: CloseCb) {
-    this.handler.closeCbs.push(cb);
+    this.ws.on('close', cb);
   }
 
   /**
    * Send binary data over the WebSocket connection;
-   * @param message - The message buffer that will be sent.
+   * @param message - The message that will be sent.
    */
-  public send(message: Buffer) {
+  public send(message: Buffer | string) {
     this.ws.send(message);
   }
 
@@ -92,7 +61,7 @@ type WebSocketOptions<
   params: Params;
   query: Query;
   do: (
-    ws: Socket,
+    ws: YedraWebSocket,
     req: {
       url: string;
       params: Typeof<ObjectSchema<Params>>;
@@ -101,65 +70,53 @@ type WebSocketOptions<
   ) => Promise<void> | void;
 };
 
+export abstract class WsEndpoint {
+  abstract handle(
+    url: URL,
+    params: Record<string, string>,
+    ws: NodeWebSocket,
+  ): Promise<void>;
+}
+
 export class Ws<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
-> implements Endpoint
-{
+> extends WsEndpoint {
   private options: WebSocketOptions<Params, Query>;
   private paramsSchema: ObjectSchema<Params>;
   private querySchema: ObjectSchema<Query>;
 
   public constructor(options: WebSocketOptions<Params, Query>) {
+    super();
     this.options = options;
     this.paramsSchema = object(options.params);
     this.querySchema = object(options.query);
   }
 
-  public get method(): 'GET' {
-    return 'GET';
-  }
-
-  public handle(
-    req: Request,
+  public async handle(
+    url: URL,
     params: Record<string, string>,
-    server: Server,
-  ): Promise<Response | undefined> {
-    const url = new URL(req.url);
-    if (req.headers.get('upgrade') !== 'websocket') {
-      throw new BadRequestError(`WebSocket required for ${url.pathname}`);
-    }
-    const handler = new WebSocketHandler(async (ws) => {
-      const socket = new Socket(handler, ws);
-      let parsedParams: Typeof<ObjectSchema<Params>>;
-      let parsedQuery: Typeof<ObjectSchema<Query>>;
-      try {
-        parsedParams = this.paramsSchema.parse(params);
-        parsedQuery = this.querySchema.parse(
-          Object.fromEntries(url.searchParams),
-        );
-      } catch (error) {
-        if (error instanceof ValidationError) {
-          throw new BadRequestError(error.format());
-        }
-        throw error;
+    ws: NodeWebSocket,
+  ): Promise<void> {
+    let parsedParams: Typeof<ObjectSchema<Params>>;
+    let parsedQuery: Typeof<ObjectSchema<Query>>;
+    try {
+      parsedParams = this.paramsSchema.parse(params);
+      parsedQuery = this.querySchema.parse(
+        Object.fromEntries(url.searchParams),
+      );
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw new BadRequestError(error.format());
       }
-      await this.options.do(socket, {
-        url: url.pathname,
-        params: parsedParams,
-        query: parsedQuery,
-      });
-    });
-    if (
-      !server.upgrade(req, {
-        data: {
-          handler,
-        },
-      })
-    ) {
-      throw new BadRequestError('Upgrading to WebSocket failed.');
+      throw error;
     }
-    return Promise.resolve(undefined);
+    await this.options.do(new YedraWebSocket(ws), {
+      url: url.pathname,
+      params: parsedParams,
+      query: parsedQuery,
+    });
+    return undefined;
   }
 
   public documentation(): object {

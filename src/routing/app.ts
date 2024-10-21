@@ -1,60 +1,40 @@
-import type { Server, ServerWebSocket } from 'bun';
-import type { Endpoint } from './endpoint.js';
+import { WebSocketServer } from 'ws';
 import { HttpError } from './errors.js';
 import { Path } from './path.js';
-import type { WebSocketHandler } from './websocket.js';
-
-type Route = {
-  path: Path;
-  endpoint: Endpoint;
-};
-
-class Counter {
-  private count = 0;
-
-  public increment(): void {
-    this.count += 1;
-  }
-
-  public decrement(): void {
-    this.count -= 1;
-  }
-
-  public async wait(): Promise<void> {
-    while (this.count > 0) {
-      await Bun.sleep(1000);
-    }
-  }
-}
+import { createServer, type Server } from 'node:http';
+import { RestEndpoint } from './rest.js';
+import { WsEndpoint } from './websocket.js';
 
 class Context {
   private server: Server;
-  private counter: Counter;
 
-  public constructor(server: Server, counter: Counter) {
+  public constructor(server: Server) {
     this.server = server;
-    this.counter = counter;
   }
 
-  public async stop(): Promise<void> {
-    // stop accepting new connections
-    this.server.stop();
-    // wait for current connections to be closed
-    await this.counter.wait();
+  public stop(): Promise<void> {
+    return new Promise((resolve) => {
+      this.server.close(() => resolve());
+    });
   }
 }
 
 export class Yedra {
-  private routes: Route[] = [];
+  private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
+  private wsRoutes: { path: Path; endpoint: WsEndpoint }[] = [];
 
-  public use(path: string, endpoint: Endpoint | Yedra): Yedra {
+  public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
-      for (const route of endpoint.routes) {
+      for (const route of endpoint.restRoutes) {
         const newPath = route.path.withPrefix(path);
-        this.routes.push({ path: newPath, endpoint: route.endpoint });
+        this.restRoutes.push({ path: newPath, endpoint: route.endpoint });
       }
+    } else if (endpoint instanceof RestEndpoint) {
+      this.restRoutes.push({ path: new Path(path), endpoint });
+    } else if (endpoint instanceof WsEndpoint) {
+      this.wsRoutes.push({ path: new Path(path), endpoint });
     } else {
-      this.routes.push({ path: new Path(path), endpoint });
+      throw new Error('Invalid endpoint argument.');
     }
     return this;
   }
@@ -64,10 +44,7 @@ export class Yedra {
    * @param req - The HTTP request.
    * @returns The HTTP response.
    */
-  public async handle(
-    req: Request,
-    server: Server,
-  ): Promise<Response | undefined> {
+  public async handle(req: Request): Promise<Response | undefined> {
     const url = new URL(req.url).pathname;
     if (
       req.method !== 'GET' &&
@@ -77,7 +54,7 @@ export class Yedra {
     ) {
       return Yedra.errorResponse(405, `Method '${req.method}' not allowed.`);
     }
-    const match = this.matchEndpoint(url, req.method);
+    const match = this.matchRestRoute(url, req.method);
     if (!match.result) {
       if (match.invalidMethod) {
         return Yedra.errorResponse(
@@ -88,11 +65,7 @@ export class Yedra {
       return Yedra.errorResponse(404, `Path '${url}' not found.`);
     }
     try {
-      return await match.result.endpoint.handle(
-        req,
-        match.result.params,
-        server,
-      );
+      return await match.result.endpoint.handle(req, match.result.params);
     } catch (error) {
       if (error instanceof HttpError) {
         return Yedra.errorResponse(error.status, error.message);
@@ -110,7 +83,7 @@ export class Yedra {
     servers: { description: string; url: string }[];
   }): object {
     const paths: Record<string, Record<string, object>> = {};
-    for (const route of this.routes) {
+    for (const route of this.restRoutes) {
       const path = route.path.toString();
       const methods = paths[path] ?? {};
       methods[route.endpoint.method.toLowerCase()] =
@@ -126,41 +99,60 @@ export class Yedra {
   }
 
   public listen(port: number): Context {
-    const counter = new Counter();
-    const server = Bun.serve<{ handler: WebSocketHandler }>({
-      port: port,
-      fetch: async (req, server) => {
-        counter.increment();
-        const url = new URL(req.url).pathname;
-        const begin = Date.now();
-        const response = await this.handle(req, server);
-        const duration = Date.now() - begin;
-        if (response !== undefined) {
-          console.log(
-            `${req.method} ${url} -> ${response.status} (${duration}ms)`,
-          );
+    const server = createServer();
+    server.on('request', (req, res) => {
+      const url = new URL(req.url as string, 'http://localhost');
+      const begin = Date.now();
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk) => {
+        chunks.push(chunk);
+      });
+      req.on('end', async () => {
+        const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
+        const response = await this.handle(
+          new Request(url, {
+            method: req.method,
+            body:
+              req.method === 'POST' || req.method === 'PUT' ? body : undefined,
+            headers: Object.entries(req.headers).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? value.join(',') : (value ?? ''),
+            ]),
+          }),
+        );
+        if (response === undefined) {
+          return;
         }
-        counter.decrement();
-        return response;
-      },
-      websocket: {
-        open(ws) {
-          Yedra.handleWebSocketErrors(ws, () => ws.data.handler.open(ws));
-        },
-        message(ws, message) {
-          Yedra.handleWebSocketErrors(ws, () =>
-            ws.data.handler.message(Buffer.from(message)),
-          );
-        },
-        close(ws, code, reason) {
-          Yedra.handleWebSocketErrors(ws, () =>
-            ws.data.handler.close(code, reason),
-          );
-        },
-      },
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        res.end(Buffer.from(await response.arrayBuffer()));
+        const duration = Date.now() - begin;
+        console.log(
+          `${req.method} ${url.pathname} -> ${response.status} (${duration}ms)`,
+        );
+      });
     });
-    console.log(`yedra listening on http://localhost:${port}...`);
-    return new Context(server, counter);
+    const wss = new WebSocketServer({ server });
+    wss.on('connection', async (ws, req) => {
+      const url = new URL(req.url as string, 'http://localhost');
+      const { result } = this.matchWsRoute(url.pathname);
+      if (!result) {
+        ws.close(4404);
+        return;
+      }
+      try {
+        await result.endpoint.handle(url, result.params, ws);
+      } catch (error) {
+        if (error instanceof HttpError) {
+          ws.close(4000 + error.status, error.message);
+        } else {
+          ws.close(1011, 'Internal Server Error');
+        }
+      }
+    });
+    server.listen(port, () => {
+      console.log(`yedra listening on http://localhost:${port}...`);
+    });
+    return new Context(server);
   }
 
   private static errorResponse(status: number, errorMessage: string) {
@@ -175,31 +167,19 @@ export class Yedra {
     );
   }
 
-  private static async handleWebSocketErrors(
-    ws: ServerWebSocket<{ handler: WebSocketHandler }>,
-    operation: () => Promise<void> | void,
-  ): Promise<void> {
-    try {
-      await operation();
-    } catch (error) {
-      if (error instanceof HttpError) {
-        ws.close(1000, error.message);
-      } else {
-        console.error(error);
-        ws.close(1011, 'Internal Server Error');
-      }
-    }
-  }
-
-  private matchEndpoint(
+  private matchRestRoute(
     url: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   ) {
     let invalidMethod = false;
     let result:
-      | { endpoint: Endpoint; params: Record<string, string>; score: number }
+      | {
+          endpoint: RestEndpoint;
+          params: Record<string, string>;
+          score: number;
+        }
       | undefined = undefined;
-    for (const route of this.routes) {
+    for (const route of this.restRoutes) {
       const match = route.path.match(url);
       if (match === undefined) {
         continue;
@@ -216,5 +196,28 @@ export class Yedra {
       }
     }
     return { invalidMethod, result };
+  }
+
+  private matchWsRoute(url: string) {
+    let result:
+      | {
+          endpoint: WsEndpoint;
+          params: Record<string, string>;
+          score: number;
+        }
+      | undefined = undefined;
+    for (const route of this.wsRoutes) {
+      const match = route.path.match(url);
+      if (match === undefined) {
+        continue;
+      }
+      const { params, score } = match;
+      const previous = result?.score;
+      if (previous === undefined || score < previous) {
+        // if there was no previous match or this one is better, use it
+        result = { endpoint: route.endpoint, params, score };
+      }
+    }
+    return { result };
   }
 }
