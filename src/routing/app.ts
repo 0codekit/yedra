@@ -33,6 +33,10 @@ export class Yedra {
         const newPath = route.path.withPrefix(path);
         this.restRoutes.push({ path: newPath, endpoint: route.endpoint });
       }
+      for (const route of endpoint.wsRoutes) {
+        const newPath = route.path.withPrefix(path);
+        this.wsRoutes.push({ path: newPath, endpoint: route.endpoint });
+      }
     } else if (endpoint instanceof RestEndpoint) {
       this.restRoutes.push({ path: new Path(path), endpoint });
     } else if (endpoint instanceof WsEndpoint) {
