@@ -4,6 +4,9 @@ import { Path } from './path.js';
 import { createServer, type Server } from 'node:http';
 import { RestEndpoint } from './rest.js';
 import { WsEndpoint } from './websocket.js';
+import { extname, join } from 'node:path';
+import { readdir, readFile, stat } from 'node:fs/promises';
+import mime from 'mime';
 
 class Context {
   private server: Server;
@@ -22,6 +25,7 @@ class Context {
 export class Yedra {
   private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
   private wsRoutes: { path: Path; endpoint: WsEndpoint }[] = [];
+  private staticFiles = new Map<string, { data: Buffer; mime: string }>();
 
   public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
@@ -39,12 +43,38 @@ export class Yedra {
     return this;
   }
 
+  public async static(dir: string, fallback?: string): Promise<void> {
+    const files = await readdir(dir, { recursive: true });
+    console.log(files);
+    await Promise.all(
+      files.map(async (file) => {
+        const absolute = join(dir, file);
+        if (!(await stat(absolute)).isFile()) {
+          return;
+        }
+        const data = await readFile(absolute);
+        this.staticFiles.set(`/${file}`, {
+          data,
+          mime: mime.getType(extname(file)) ?? 'application/octet-stream',
+        });
+      }),
+    );
+    if (fallback) {
+      const data = await readFile(fallback);
+      this.staticFiles.set('__fallback', {
+        data,
+        mime: mime.getType(extname(fallback)) ?? 'application/octet-stream',
+      });
+    }
+    console.log(this.staticFiles);
+  }
+
   /**
    * Handle an HTTP request.
    * @param req - The HTTP request.
    * @returns The HTTP response.
    */
-  public async handle(req: Request): Promise<Response | undefined> {
+  public async handle(req: Request): Promise<Response> {
     const url = new URL(req.url).pathname;
     if (
       req.method !== 'GET' &&
@@ -56,6 +86,18 @@ export class Yedra {
     }
     const match = this.matchRestRoute(url, req.method);
     if (!match.result) {
+      if (req.method === 'GET') {
+        // try returning a static file
+        const staticFile =
+          this.staticFiles.get(url) ?? this.staticFiles.get('__fallback');
+        if (staticFile !== undefined) {
+          return new Response(staticFile.data, {
+            headers: {
+              'content-type': staticFile.mime,
+            },
+          });
+        }
+      }
       if (match.invalidMethod) {
         return Yedra.errorResponse(
           405,
@@ -120,9 +162,6 @@ export class Yedra {
             ]),
           }),
         );
-        if (response === undefined) {
-          return;
-        }
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
         const duration = Date.now() - begin;

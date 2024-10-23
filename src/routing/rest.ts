@@ -56,7 +56,7 @@ export abstract class RestEndpoint {
   abstract handle(
     req: Request,
     params: Record<string, string>,
-  ): Promise<Response | undefined>;
+  ): Promise<Response>;
   abstract documentation(): object;
 }
 
@@ -92,7 +92,7 @@ class ConcreteRestEndpoint<
   public async handle(
     req: Request,
     params: Record<string, string>,
-  ): Promise<Response | undefined> {
+  ): Promise<Response> {
     let parsedBody: Typeof<Req>;
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
