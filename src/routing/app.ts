@@ -45,7 +45,6 @@ export class Yedra {
 
   public async static(dir: string, fallback?: string): Promise<void> {
     const files = await readdir(dir, { recursive: true });
-    console.log(files);
     await Promise.all(
       files.map(async (file) => {
         const absolute = join(dir, file);
@@ -66,7 +65,6 @@ export class Yedra {
         mime: mime.getType(extname(fallback)) ?? 'application/octet-stream',
       });
     }
-    console.log(this.staticFiles);
   }
 
   /**
