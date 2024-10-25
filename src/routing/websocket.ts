@@ -1,10 +1,10 @@
+import type { WebSocket as NodeWebSocket } from 'ws';
 import { paramDocs } from '../util/docs.js';
 import type { Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
 import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import { BadRequestError } from './errors.js';
-import type { WebSocket as NodeWebSocket } from 'ws';
 
 type MessageCb = (message: Buffer) => Promise<void> | void;
 type CloseCb = (

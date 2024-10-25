@@ -54,8 +54,11 @@ type EndpointOptions<
 export abstract class RestEndpoint {
   abstract get method(): 'GET' | 'POST' | 'PUT' | 'DELETE';
   abstract handle(
-    req: Request,
+    pathname: string,
+    body: string | Buffer,
     params: Record<string, string>,
+    query: Record<string, string>,
+    headers: Record<string, string>,
   ): Promise<Response>;
   abstract documentation(): object;
 }
@@ -90,24 +93,24 @@ class ConcreteRestEndpoint<
   }
 
   public async handle(
-    req: Request,
+    url: string,
+    body: string | Buffer,
     params: Record<string, string>,
+    query: Record<string, string>,
+    headers: Record<string, string>,
   ): Promise<Response> {
     let parsedBody: Typeof<Req>;
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
-    const url = new URL(req.url);
     try {
       parsedBody = this.options.req.deserialize(
-        Buffer.from(await req.arrayBuffer()),
-        req.headers.get('content-type') ?? 'application/octet-stream',
+        typeof body === 'string' ? Buffer.from(body) : body,
+        headers['content-type'] ?? 'application/octet-stream',
       );
       parsedParams = this.paramsSchema.parse(params);
-      parsedQuery = this.querySchema.parse(
-        Object.fromEntries(url.searchParams),
-      );
-      parsedHeaders = this.headersSchema.parse(Object.fromEntries(req.headers));
+      parsedQuery = this.querySchema.parse(query);
+      parsedHeaders = this.headersSchema.parse(headers);
     } catch (error) {
       if (error instanceof SyntaxError) {
         throw new BadRequestError(error.message);
@@ -118,7 +121,7 @@ class ConcreteRestEndpoint<
       throw error;
     }
     const response = await this.options.do({
-      url: url.pathname,
+      url,
       params: parsedParams,
       query: parsedQuery,
       headers: parsedHeaders,

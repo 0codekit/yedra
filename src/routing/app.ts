@@ -1,12 +1,12 @@
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { type Server, createServer } from 'node:http';
+import { extname, join } from 'node:path';
+import mime from 'mime';
 import { WebSocketServer } from 'ws';
 import { HttpError } from './errors.js';
 import { Path } from './path.js';
-import { createServer, type Server } from 'node:http';
 import { RestEndpoint } from './rest.js';
 import { WsEndpoint } from './websocket.js';
-import { extname, join } from 'node:path';
-import { readdir, readFile, stat } from 'node:fs/promises';
-import mime from 'mime';
 
 class Context {
   private server: Server;
@@ -76,22 +76,32 @@ export class Yedra {
    * @param req - The HTTP request.
    * @returns The HTTP response.
    */
-  public async handle(req: Request): Promise<Response> {
-    const url = new URL(req.url).pathname;
+  public async fetch(
+    url: URL | string,
+    options?: {
+      method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+      body?: string | Buffer;
+      headers?: Record<string, string>;
+    },
+  ): Promise<Response> {
+    const parsedUrl: URL =
+      typeof url === 'string' ? new URL(url, 'http://localhost') : url;
+    const method = options?.method ?? 'GET';
     if (
-      req.method !== 'GET' &&
-      req.method !== 'POST' &&
-      req.method !== 'PUT' &&
-      req.method !== 'DELETE'
+      method !== 'GET' &&
+      method !== 'POST' &&
+      method !== 'PUT' &&
+      method !== 'DELETE'
     ) {
-      return Yedra.errorResponse(405, `Method '${req.method}' not allowed.`);
+      return Yedra.errorResponse(405, `Method '${method}' not allowed.`);
     }
-    const match = this.matchRestRoute(url, req.method);
+    const match = this.matchRestRoute(parsedUrl.pathname, method);
     if (!match.result) {
-      if (req.method === 'GET') {
+      if (method === 'GET') {
         // try returning a static file
         const staticFile =
-          this.staticFiles.get(url) ?? this.staticFiles.get('__fallback');
+          this.staticFiles.get(parsedUrl.pathname) ??
+          this.staticFiles.get('__fallback');
         if (staticFile !== undefined) {
           return new Response(staticFile.data, {
             headers: {
@@ -103,13 +113,22 @@ export class Yedra {
       if (match.invalidMethod) {
         return Yedra.errorResponse(
           405,
-          `Method '${req.method}' not allowed for path '${url}'.`,
+          `Method '${method}' not allowed for path '${parsedUrl.pathname}'.`,
         );
       }
-      return Yedra.errorResponse(404, `Path '${url}' not found.`);
+      return Yedra.errorResponse(
+        404,
+        `Path '${parsedUrl.pathname}' not found.`,
+      );
     }
     try {
-      return await match.result.endpoint.handle(req, match.result.params);
+      return await match.result.endpoint.handle(
+        parsedUrl.pathname,
+        options?.body ?? '',
+        match.result.params,
+        Object.fromEntries(parsedUrl.searchParams),
+        options?.headers ?? {},
+      );
     } catch (error) {
       if (error instanceof HttpError) {
         return Yedra.errorResponse(error.status, error.message);
@@ -153,17 +172,17 @@ export class Yedra {
       });
       req.on('end', async () => {
         const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
-        const response = await this.handle(
-          new Request(url, {
-            method: req.method,
-            body:
-              req.method === 'POST' || req.method === 'PUT' ? body : undefined,
-            headers: Object.entries(req.headers).map(([key, value]) => [
+        const response = await this.fetch(url, {
+          method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
+          body:
+            req.method === 'POST' || req.method === 'PUT' ? body : undefined,
+          headers: Object.fromEntries(
+            Object.entries(req.headers).map(([key, value]) => [
               key,
               Array.isArray(value) ? value.join(',') : (value ?? ''),
             ]),
-          }),
-        );
+          ),
+        });
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
         const duration = Date.now() - begin;
