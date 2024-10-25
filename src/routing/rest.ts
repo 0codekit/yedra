@@ -1,6 +1,6 @@
 import { paramDocs } from '../util/docs.js';
 import type { BodyType, Typeof } from '../validation/body.js';
-import { ValidationError } from '../validation/error.js';
+import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
 import { type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
@@ -103,29 +103,64 @@ class ConcreteRestEndpoint<
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
+    const issues: Issue[] = [];
     try {
       parsedBody = this.options.req.deserialize(
         typeof body === 'string' ? Buffer.from(body) : body,
         headers['content-type'] ?? 'application/octet-stream',
       );
-      parsedParams = this.paramsSchema.parse(params);
-      parsedQuery = this.querySchema.parse(query);
-      parsedHeaders = this.headersSchema.parse(headers);
     } catch (error) {
       if (error instanceof SyntaxError) {
-        throw new BadRequestError(error.message);
+        issues.push(
+          new Issue('invalidSyntax', ['body'], 'JSON', error.message),
+        );
+      } else if (error instanceof ValidationError) {
+        issues.push(...error.withPrefix('body'));
+      } else {
+        throw error;
       }
+    }
+    try {
+      parsedParams = this.paramsSchema.parse(params);
+    } catch (error) {
       if (error instanceof ValidationError) {
-        throw new BadRequestError(error.format());
+        issues.push(...error.withPrefix('params'));
+      } else {
+        throw error;
       }
-      throw error;
+    }
+    try {
+      parsedQuery = this.querySchema.parse(query);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        issues.push(...error.withPrefix('query'));
+      } else {
+        throw error;
+      }
+    }
+    try {
+      parsedHeaders = this.headersSchema.parse(headers);
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        issues.push(...error.withPrefix('headers'));
+      } else {
+        throw error;
+      }
+    }
+    if (issues.length > 0) {
+      const error = new ValidationError(issues);
+      throw new BadRequestError(error.format());
     }
     const response = await this.options.do({
       url,
-      params: parsedParams,
-      query: parsedQuery,
-      headers: parsedHeaders,
-      body: parsedBody,
+      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
+      params: parsedParams!,
+      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
+      query: parsedQuery!,
+      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
+      headers: parsedHeaders!,
+      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
+      body: parsedBody!,
     });
     if (response.body instanceof Uint8Array) {
       return new Response(response.body, {

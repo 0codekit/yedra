@@ -1,4 +1,5 @@
 type IssueCode =
+  | 'invalidSyntax'
   | 'invalidType'
   | 'tooSmall'
   | 'tooBig'
@@ -9,6 +10,7 @@ type IssueCode =
   | 'invalidContentType';
 
 const issueMessages: Record<IssueCode, string> = {
+  invalidSyntax: '${actual}',
   invalidType: "Expected '${expected}' but got '${actual}'",
   tooSmall: "Must be at least '${expected}' but was '${actual}'",
   tooBig: "Must be at most '${expected}' but was '${actual}'",
