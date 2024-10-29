@@ -1,12 +1,13 @@
 {
   "name": "yedra",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "repository": "github:0codekit/yedra",
   "main": "dist/index.js",
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "@types/node": "^22.8.0",
+    "@types/node": "^22.8.2",
     "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.12",
     "typescript": "^5.6.3"
   },
   "bugs": "https://github.com/0codekit/yedra/issues",
@@ -21,10 +22,8 @@
   "types": "dist/index.d.ts",
   "type": "module",
   "dependencies": {
-    "@types/ws": "^8.5.12",
-    "bufferutil": "^4.0.8",
     "mime": "^4.0.4",
-    "uuid": "^10.0.0",
+    "uuid": "^11.0.2",
     "ws": "^8.18.0"
   }
 }
