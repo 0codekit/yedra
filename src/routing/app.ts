@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { type Server, createServer } from 'node:http';
 import { extname, join } from 'node:path';
 import mime from 'mime';
+import { v4 } from 'uuid';
 import { WebSocketServer } from 'ws';
 import { HttpError } from './errors.js';
 import { Path } from './path.js';
@@ -82,8 +83,11 @@ export class Yedra {
       method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
       body?: string | Buffer;
       headers?: Record<string, string>;
+      trace?: string;
     },
   ): Promise<Response> {
+    // unique trace ID
+    const trace = options?.trace ?? v4();
     const parsedUrl: URL =
       typeof url === 'string' ? new URL(url, 'http://localhost') : url;
     const method = options?.method ?? 'GET';
@@ -93,7 +97,7 @@ export class Yedra {
       method !== 'PUT' &&
       method !== 'DELETE'
     ) {
-      return Yedra.errorResponse(405, `Method '${method}' not allowed.`);
+      return Yedra.errorResponse(405, `Method '${method}' not allowed.`, trace);
     }
     const match = this.matchRestRoute(parsedUrl.pathname, method);
     if (!match.result) {
@@ -114,11 +118,13 @@ export class Yedra {
         return Yedra.errorResponse(
           405,
           `Method '${method}' not allowed for path '${parsedUrl.pathname}'.`,
+          trace,
         );
       }
       return Yedra.errorResponse(
         404,
         `Path '${parsedUrl.pathname}' not found.`,
+        trace,
       );
     }
     try {
@@ -131,10 +137,10 @@ export class Yedra {
       );
     } catch (error) {
       if (error instanceof HttpError) {
-        return Yedra.errorResponse(error.status, error.message);
+        return Yedra.errorResponse(error.status, error.message, trace);
       }
       console.error(error);
-      return Yedra.errorResponse(500, 'Internal Server Error.');
+      return Yedra.errorResponse(500, 'Internal Server Error.', trace);
     }
   }
 
@@ -171,6 +177,7 @@ export class Yedra {
         chunks.push(chunk);
       });
       req.on('end', async () => {
+        const trace = v4();
         const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
         const response = await this.fetch(url, {
           method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -182,12 +189,13 @@ export class Yedra {
               Array.isArray(value) ? value.join(',') : (value ?? ''),
             ]),
           ),
+          trace,
         });
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));
         const duration = Date.now() - begin;
         console.log(
-          `${req.method} ${url.pathname} -> ${response.status} (${duration}ms)`,
+          `${req.method} ${url.pathname} -> ${response.status} (${duration}ms) [${trace}]`,
         );
       });
     });
@@ -215,11 +223,16 @@ export class Yedra {
     return new Context(server);
   }
 
-  private static errorResponse(status: number, errorMessage: string) {
+  private static errorResponse(
+    status: number,
+    errorMessage: string,
+    trace: string,
+  ) {
     return Response.json(
       {
         status,
         errorMessage,
+        trace,
       },
       {
         status,
