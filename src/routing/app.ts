@@ -1,5 +1,6 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { type Server, createServer } from 'node:http';
+import { type Server, createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import { extname, join } from 'node:path';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
@@ -161,8 +162,17 @@ export class Yedra {
     };
   }
 
-  public listen(port: number): Context {
-    const server = createServer();
+  public listen(
+    port: number,
+    options?: { tls?: { key: string; cert: string } },
+  ): Context {
+    const server =
+      options?.tls === undefined
+        ? createHttpServer()
+        : createHttpsServer({
+            key: options.tls.key,
+            cert: options.tls.cert,
+          });
     server.on('request', (req, res) => {
       const url = new URL(req.url as string, 'http://localhost');
       const begin = Date.now();
