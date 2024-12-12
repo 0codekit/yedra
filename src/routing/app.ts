@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { type Server, createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { extname, join } from 'node:path';
+import { URL } from 'node:url';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
 import { HttpError } from './errors.js';

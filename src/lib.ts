@@ -24,6 +24,7 @@ export { _enum as enum } from './validation/enum.js';
 export { ValidationError } from './validation/error.js';
 export { intersection } from './validation/intersection.js';
 export { number } from './validation/number.js';
+export { integer } from './validation/integer.js';
 export { object } from './validation/object.js';
 export { record } from './validation/record.js';
 export { Schema } from './validation/schema.js';

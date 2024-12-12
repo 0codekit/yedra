@@ -1,3 +1,4 @@
+import type { URL } from 'node:url';
 import type { WebSocket as NodeWebSocket } from 'ws';
 import { paramDocs } from '../util/docs.js';
 import type { Typeof } from '../validation/body.js';
