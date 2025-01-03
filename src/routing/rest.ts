@@ -185,9 +185,10 @@ class ConcreteRestEndpoint<
       tags: [this.options.category],
       summary: this.options.summary,
       description: this.options.description,
-      security: Object.fromEntries(
-        (this.options.security ?? []).map((security) => [security, []]),
-      ),
+      security:
+        this.options.security !== undefined
+          ? this.options.security.map((security) => ({ [security]: [] }))
+          : [],
       parameters,
       requestBody:
         this.options.req instanceof NoneBody
