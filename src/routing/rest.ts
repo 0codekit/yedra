@@ -1,4 +1,5 @@
 import { paramDocs } from '../util/docs.js';
+import type { SecurityScheme } from '../util/security.js';
 import type { BodyType, Typeof } from '../validation/body.js';
 import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
@@ -61,7 +62,9 @@ export abstract class RestEndpoint {
     query: Record<string, string>,
     headers: Record<string, string>,
   ): Promise<Response>;
-  abstract documentation(): object;
+  abstract documentation(
+    securitySchemes: Record<string, SecurityScheme>,
+  ): object;
 }
 
 class ConcreteRestEndpoint<
@@ -175,11 +178,28 @@ class ConcreteRestEndpoint<
     });
   }
 
-  public documentation(): object {
+  public documentation(
+    securitySchemes: Record<string, SecurityScheme>,
+  ): object {
     const parameters = [
-      ...paramDocs(this.options.params, 'path'),
-      ...paramDocs(this.options.query, 'query'),
-      ...paramDocs(this.options.headers, 'header'),
+      ...paramDocs(
+        this.options.params,
+        'path',
+        this.options.security ?? [],
+        securitySchemes,
+      ),
+      ...paramDocs(
+        this.options.query,
+        'query',
+        this.options.security ?? [],
+        securitySchemes,
+      ),
+      ...paramDocs(
+        this.options.headers,
+        'header',
+        this.options.security ?? [],
+        securitySchemes,
+      ),
     ];
     return {
       tags: [this.options.category],

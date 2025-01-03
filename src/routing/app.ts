@@ -5,6 +5,7 @@ import { extname, join } from 'node:path';
 import { URL } from 'node:url';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
+import type { SecurityScheme } from '../util/security.js';
 import { HttpError } from './errors.js';
 import { Path } from './path.js';
 import { RestEndpoint } from './rest.js';
@@ -145,11 +146,7 @@ export class Yedra {
    */
   public docs(options: {
     info: { title: string; description: string; version: string };
-    security?: Record<
-      string,
-      | { type: 'http'; scheme: 'basic' | 'bearer' }
-      | { type: 'apiKey'; in: 'header' | 'query' | 'cookie'; name: string }
-    >;
+    security?: Record<string, SecurityScheme>;
     servers: { description: string; url: string }[];
   }): object {
     const paths: Record<string, Record<string, object>> = {};
@@ -157,7 +154,7 @@ export class Yedra {
       const path = route.path.toString();
       const methods = paths[path] ?? {};
       methods[route.endpoint.method.toLowerCase()] =
-        route.endpoint.documentation();
+        route.endpoint.documentation(options.security ?? {});
       paths[path] = methods;
     }
     return {
