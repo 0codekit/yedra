@@ -145,6 +145,11 @@ export class Yedra {
    */
   public docs(options: {
     info: { title: string; description: string; version: string };
+    security?: Record<
+      string,
+      | { type: 'http'; scheme: 'basic' | 'bearer' }
+      | { type: 'apiKey'; in: 'header' | 'query' | 'cookie'; name: string }
+    >;
     servers: { description: string; url: string }[];
   }): object {
     const paths: Record<string, Record<string, object>> = {};
@@ -158,6 +163,9 @@ export class Yedra {
     return {
       openapi: '3.0.2',
       info: options.info,
+      components: {
+        securitySchemes: options.security,
+      },
       servers: options.servers,
       paths,
     };

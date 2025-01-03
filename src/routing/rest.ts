@@ -36,6 +36,7 @@ type EndpointOptions<
   category: string;
   summary: string;
   description?: string;
+  security?: string[];
   params: Params;
   query: Query;
   headers: Headers;
@@ -184,6 +185,9 @@ class ConcreteRestEndpoint<
       tags: [this.options.category],
       summary: this.options.summary,
       description: this.options.description,
+      security: Object.fromEntries(
+        (this.options.security ?? []).map((security) => [security, []]),
+      ),
       parameters,
       requestBody:
         this.options.req instanceof NoneBody
