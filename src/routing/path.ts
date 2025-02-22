@@ -22,11 +22,11 @@ export class Path {
       .split('/')
       .filter((segment) => segment !== '');
     const invalidSegment = this.expected.find(
-      (part) => part.match(/^((:?[a-z0-9-\.]+\??)|\*)$/) === null,
+      (part) => part.match(/^((:?[A-Za-z0-9\-\.]+\??)|\*)$/) === null,
     );
     if (invalidSegment) {
       throw new Error(
-        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^((:?[a-z0-9-\.]+\\??)|\\*)$/.`,
+        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^((:?[A-Za-z0-9-\.]+\\??)|\\*)$/.`,
       );
     }
     const wildcard = this.expected.findIndex((part) => part === '*');

@@ -6,7 +6,7 @@ test('Path Invalid', () => {
     `API path abc/test is invalid: Must start with '/'.`,
   );
   expect(() => new Path('/abc/hello_world')).toThrow(
-    'API path /abc/hello_world is invalid: Segment hello_world does not match regex /^((:?[a-z0-9-]+\\??)|\\*)$/.',
+    'API path /abc/hello_world is invalid: Segment hello_world does not match regex /^((:?[A-Za-z0-9-.]+\\??)|\\*)$/.',
   );
   expect(() => new Path('/:id?/test')).toThrow(
     'API path /:id?/test is invalid: Optional segment cannot be followed by non-optional segment.',
