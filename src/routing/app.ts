@@ -29,6 +29,10 @@ export class Yedra {
   private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
   private wsRoutes: { path: Path; endpoint: WsEndpoint }[] = [];
   private staticFiles = new Map<string, { data: Buffer; mime: string }>();
+  private requestData: Record<
+    string,
+    { count: number; duration: number } | undefined
+  > = {};
 
   public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
@@ -205,6 +209,7 @@ export class Yedra {
         console.log(
           `${req.method} ${url.pathname} -> ${response.status} (${duration}ms)`,
         );
+        this.track(req.method as string, response.status, duration / 1000);
       });
     });
     const wss = new WebSocketServer({ server });
@@ -295,5 +300,25 @@ export class Yedra {
       }
     }
     return { result };
+  }
+
+  private track(method: string, status: number, duration: number): void {
+    const id = `${method}-${status}`;
+    const data = this.requestData[id] ?? { count: 0, duration: 0 };
+    this.requestData[id] = {
+      count: data.count + 1,
+      duration: data.duration + duration,
+    };
+  }
+
+  public metrics(): string {
+    return Object.entries(this.requestData)
+      .map(([key, data]) => {
+        const [method, status] = key.split('-');
+        return `yedra_requests_total{method="${method}",status="${status}"} ${data?.count}
+yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.duration}
+`;
+      })
+      .join('');
   }
 }
