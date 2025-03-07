@@ -33,6 +33,11 @@ export class Yedra {
     string,
     { count: number; duration: number } | undefined
   > = {};
+  private readonly metricsEndpoint: string | undefined;
+
+  public constructor(options?: { metrics: string }) {
+    this.metricsEndpoint = options?.metrics;
+  }
 
   public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
@@ -191,6 +196,15 @@ export class Yedra {
         chunks.push(chunk);
       });
       req.on('end', async () => {
+        if (
+          this.metricsEndpoint &&
+          req.method === 'GET' &&
+          req.url === this.metricsEndpoint
+        ) {
+          res.writeHead(200);
+          res.end(this.metrics());
+          return;
+        }
         const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
         const response = await this.fetch(url, {
           method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -311,7 +325,7 @@ export class Yedra {
     };
   }
 
-  public metrics(): string {
+  private metrics(): string {
     return Object.entries(this.requestData)
       .map(([key, data]) => {
         const [method, status] = key.split('-');
