@@ -33,9 +33,9 @@ export class Yedra {
     string,
     { count: number; duration: number } | undefined
   > = {};
-  private readonly metricsEndpoint: string | undefined;
+  private readonly metricsEndpoint: { port: number; path: string } | undefined;
 
-  public constructor(options?: { metrics: string }) {
+  public constructor(options?: { metrics: { port: number; path: string } }) {
     this.metricsEndpoint = options?.metrics;
   }
 
@@ -196,15 +196,6 @@ export class Yedra {
         chunks.push(chunk);
       });
       req.on('end', async () => {
-        if (
-          this.metricsEndpoint &&
-          req.method === 'GET' &&
-          req.url === this.metricsEndpoint
-        ) {
-          res.writeHead(200);
-          res.end(this.metrics());
-          return;
-        }
         const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
         const response = await this.fetch(url, {
           method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -245,8 +236,26 @@ export class Yedra {
       }
     });
     server.listen(port, () => {
-      console.log(`yedra listening on http://localhost:${port}...`);
+      console.log(`yedra listening on http://localhost:${port}`);
     });
+    const metricsEndpoint = this.metricsEndpoint;
+    if (metricsEndpoint !== undefined) {
+      const metricsServer = createHttpServer();
+      metricsServer.on('request', (req, res) => {
+        if (req.method === 'GET' && req.url === metricsEndpoint.path) {
+          res.writeHead(200);
+          res.end(this.generateMetrics());
+        } else {
+          res.writeHead(404);
+          res.end('Not found');
+        }
+      });
+      metricsServer.listen(metricsEndpoint.port, () => {
+        console.log(
+          `yedra metrics on http://localhost:${metricsEndpoint.port}${metricsEndpoint.path}`,
+        );
+      });
+    }
     return new Context(server);
   }
 
@@ -325,7 +334,7 @@ export class Yedra {
     };
   }
 
-  private metrics(): string {
+  private generateMetrics(): string {
     return Object.entries(this.requestData)
       .map(([key, data]) => {
         const [method, status] = key.split('-');
