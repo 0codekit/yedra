@@ -16,16 +16,42 @@ type CloseCb = (
 class YedraWebSocket {
   private ws: NodeWebSocket;
 
+  private messageQueue: Buffer[] = [];
+
+  private messageHandlers: MessageCb[] = [];
+  private closeHandlers: CloseCb[] = [];
+
   public constructor(ws: NodeWebSocket) {
     this.ws = ws;
+    ws.on('message', (data: Buffer) => {
+      for (const cb of this.messageHandlers) {
+        cb(data);
+      }
+      if (this.messageHandlers.length === 0) {
+        // there are no message handlers registered yet,
+        // add the message to the queue
+        this.messageQueue.push(data);
+      }
+    });
+    ws.on('close', (code: number, reason: string) => {
+      for (const cb of this.closeHandlers) {
+        cb(code, reason);
+      }
+    });
   }
 
   public set onmessage(cb: MessageCb) {
-    this.ws.on('message', cb);
+    this.messageHandlers.push(cb);
+    // if there are queued messages, process them now
+    const messages = this.messageQueue;
+    this.messageQueue = [];
+    for (const message of messages) {
+      cb(message);
+    }
   }
 
   public set onclose(cb: CloseCb) {
-    this.ws.on('close', cb);
+    this.closeHandlers.push(cb);
   }
 
   /**
