@@ -16,6 +16,13 @@ test('Path Invalid', () => {
   );
 });
 
+test('Path Root', () => {
+  const path = new Path('/');
+  expect(path.toString()).toStrictEqual('/');
+  expect(path.match('/abc')).toBeUndefined();
+  expect(path.match('/')).toStrictEqual({ params: {}, score: 0 });
+});
+
 test('Path Simple', () => {
   const path = new Path('/abc/test');
   expect(path.toString()).toStrictEqual('/abc/test');

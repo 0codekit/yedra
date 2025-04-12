@@ -165,7 +165,6 @@ export class Yedra {
       );
     }
     try {
-      // TODO: we aren't handling HTTP errors correctly here, are we?
       return await match.result.endpoint.handle({
         url: req.url.pathname,
         body: req.body,
@@ -197,6 +196,10 @@ export class Yedra {
         get?: () => Promise<string> | string;
       };
       static?: { dir: string; fallback?: string };
+      /**
+       * Prevents all normal output from Yedra. Mostly useful for tests.
+       */
+      quiet?: boolean;
     },
   ): Promise<Context> {
     const staticFiles = await Yedra.loadStatic(options?.static);
@@ -231,9 +234,11 @@ export class Yedra {
       }
       res.end();
       const duration = Date.now() - begin;
-      console.log(
-        `${req.method} ${url.pathname} -> ${response.status} (${duration}ms)`,
-      );
+      if (options?.quiet !== true) {
+        console.log(
+          `${req.method} ${url.pathname} -> ${status} (${duration}ms)`,
+        );
+      }
       this.track(req.method as string, status, duration / 1000);
     });
     const wss = new WebSocketServer({ server });
@@ -255,7 +260,9 @@ export class Yedra {
       }
     });
     server.listen(port, () => {
-      console.log(`yedra listening on http://localhost:${port}`);
+      if (options?.quiet !== true) {
+        console.log(`yedra listening on http://localhost:${port}`);
+      }
     });
     if (options?.metrics !== undefined) {
       const metricsEndpoint = options.metrics;
@@ -273,11 +280,13 @@ export class Yedra {
           res.end('Not found');
         }
       });
-      metricsServer.listen(metricsEndpoint.port, () => {
-        console.log(
-          `yedra metrics on http://localhost:${metricsEndpoint.port}${metricsEndpoint.path}`,
-        );
-      });
+      if (options.quiet !== true) {
+        metricsServer.listen(metricsEndpoint.port, () => {
+          console.log(
+            `yedra metrics on http://localhost:${metricsEndpoint.port}${metricsEndpoint.path}`,
+          );
+        });
+      }
     }
     return new Context(server);
   }

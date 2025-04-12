@@ -4,7 +4,7 @@ import type { SecurityScheme } from '../util/security.js';
 import type { BodyType, Typeof } from '../validation/body.js';
 import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
-import { type ObjectSchema, object } from '../validation/object.js';
+import { type ObjectSchema, laxObject, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import { BadRequestError } from './errors.js';
 
@@ -94,7 +94,8 @@ class ConcreteRestEndpoint<
     this.options = options;
     this.paramsSchema = object(options.params);
     this.querySchema = object(options.query);
-    this.headersSchema = object(options.headers);
+    // headers need to be lax, since there are lots of them
+    this.headersSchema = laxObject(options.headers);
   }
 
   public get method(): 'GET' | 'POST' | 'PUT' | 'DELETE' {
@@ -118,7 +119,7 @@ class ConcreteRestEndpoint<
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
     const issues: Issue[] = [];
     try {
-      parsedBody = this.options.req.deserialize(
+      parsedBody = await this.options.req.deserialize(
         req.body,
         req.headers['content-type'] ?? 'application/octet-stream',
       );
