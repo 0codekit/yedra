@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+
 /**
  * The base class for all body types.
  */
@@ -8,11 +10,14 @@ export abstract class BodyType<T> {
   }
 
   /**
-   * Deserialize a raw buffer.
-   * @param buffer - The raw body.
+   * Deserialize a raw stream.
+   * @param stream - The raw stream.
    * @param contentType - The content type.
    */
-  public abstract deserialize(buffer: Uint8Array, contentType: string): T;
+  public abstract deserialize(
+    stream: Readable,
+    contentType: string,
+  ): Promise<T>;
 
   /**
    * Generate OpenAPI docs for this body.

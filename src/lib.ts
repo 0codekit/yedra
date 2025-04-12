@@ -29,6 +29,7 @@ export { record } from './validation/record.js';
 export { Schema } from './validation/schema.js';
 export { BodyType, type Typeof } from './validation/body.js';
 export { raw } from './validation/raw.js';
+export { stream } from './validation/stream.js';
 export { either } from './validation/either.js';
 export { string } from './validation/string.js';
 export { union } from './validation/union.js';

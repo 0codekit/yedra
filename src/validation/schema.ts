@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
 import { Issue, ValidationError } from './error.js';
 
@@ -5,7 +7,8 @@ import { Issue, ValidationError } from './error.js';
  * The base class for all schemas.
  */
 export abstract class Schema<T> extends BodyType<T> {
-  public deserialize(buffer: Uint8Array, contentType: string): T {
+  public async deserialize(stream: Readable, contentType: string): Promise<T> {
+    const buffer = await readableToBuffer(stream);
     if (buffer.length === 0) {
       return this.parse({});
     }

@@ -1,7 +1,9 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import { type Server, createServer as createHttpServer } from 'node:http';
+import type { Server } from 'node:http';
+import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { extname, join } from 'node:path';
+import type { Readable } from 'node:stream';
 import { URL } from 'node:url';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
@@ -25,25 +27,13 @@ class Context {
   }
 }
 
-type MetricsConfig = {
-  port: number;
-  path: string;
-  get?: () => Promise<string>;
-};
-
 export class Yedra {
   private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
   private wsRoutes: { path: Path; endpoint: WsEndpoint }[] = [];
-  private staticFiles = new Map<string, { data: Buffer; mime: string }>();
   private requestData: Record<
     string,
     { count: number; duration: number } | undefined
   > = {};
-  private readonly metricsEndpoint: MetricsConfig | undefined;
-
-  public constructor(options?: { metrics: MetricsConfig }) {
-    this.metricsEndpoint = options?.metrics;
-  }
 
   public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
@@ -63,97 +53,6 @@ export class Yedra {
       throw new Error('Invalid endpoint argument.');
     }
     return this;
-  }
-
-  public async static(dir: string, fallback?: string): Promise<void> {
-    const files = await readdir(dir, { recursive: true });
-    await Promise.all(
-      files.map(async (file) => {
-        const absolute = join(dir, file);
-        if (!(await stat(absolute)).isFile()) {
-          return;
-        }
-        const data = await readFile(absolute);
-        this.staticFiles.set(`/${file}`, {
-          data,
-          mime: mime.getType(extname(file)) ?? 'application/octet-stream',
-        });
-      }),
-    );
-    if (fallback) {
-      const data = await readFile(fallback);
-      this.staticFiles.set('__fallback', {
-        data,
-        mime: mime.getType(extname(fallback)) ?? 'application/octet-stream',
-      });
-    }
-  }
-
-  /**
-   * Handle an HTTP request.
-   * @param req - The HTTP request.
-   * @returns The HTTP response.
-   */
-  public async fetch(
-    url: URL | string,
-    options?: {
-      method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-      body?: string | Buffer;
-      headers?: Record<string, string>;
-    },
-  ): Promise<Response> {
-    const parsedUrl: URL =
-      typeof url === 'string' ? new URL(url, 'http://localhost') : url;
-    const method = options?.method ?? 'GET';
-    if (
-      method !== 'GET' &&
-      method !== 'POST' &&
-      method !== 'PUT' &&
-      method !== 'DELETE'
-    ) {
-      return Yedra.errorResponse(405, `Method '${method}' not allowed.`);
-    }
-    const match = this.matchRestRoute(parsedUrl.pathname, method);
-    if (!match.result) {
-      if (method === 'GET') {
-        // try returning a static file
-        const staticFile =
-          this.staticFiles.get(parsedUrl.pathname) ??
-          this.staticFiles.get('__fallback');
-        if (staticFile !== undefined) {
-          return new Response(staticFile.data, {
-            headers: {
-              'content-type': staticFile.mime,
-            },
-          });
-        }
-      }
-      if (match.invalidMethod) {
-        return Yedra.errorResponse(
-          405,
-          `Method '${method}' not allowed for path '${parsedUrl.pathname}'.`,
-        );
-      }
-      return Yedra.errorResponse(
-        404,
-        `Path '${parsedUrl.pathname}' not found.`,
-      );
-    }
-    try {
-      return await match.result.endpoint.handle(
-        parsedUrl.pathname,
-        options?.body ?? '',
-        match.result.params,
-        Object.fromEntries(parsedUrl.searchParams),
-        options?.headers ?? {},
-      );
-    } catch (error) {
-      if (error instanceof HttpError) {
-        return Yedra.errorResponse(error.status, error.message);
-      }
-      console.error(error);
-      return Yedra.errorResponse(500, 'Internal Server Error.');
-    }
   }
 
   /**
@@ -183,10 +82,124 @@ export class Yedra {
     };
   }
 
-  public listen(
+  private static async loadStatic(
+    options: { dir: string; fallback?: string } | undefined,
+  ): Promise<Map<string, { data: Buffer; mime: string }>> {
+    if (options === undefined) {
+      return new Map();
+    }
+    const staticFiles = new Map<string, { data: Buffer; mime: string }>();
+    const files = await readdir(options.dir, { recursive: true });
+    await Promise.all(
+      files.map(async (file) => {
+        const absolute = join(options.dir, file);
+        if (!(await stat(absolute)).isFile()) {
+          return;
+        }
+        const data = await readFile(absolute);
+        staticFiles.set(`/${file}`, {
+          data,
+          mime: mime.getType(extname(file)) ?? 'application/octet-stream',
+        });
+      }),
+    );
+    if (options.fallback) {
+      const data = await readFile(options.fallback);
+      staticFiles.set('__fallback', {
+        data,
+        mime:
+          mime.getType(extname(options.fallback)) ?? 'application/octet-stream',
+      });
+    }
+    return staticFiles;
+  }
+
+  private async performRequest(
+    staticFiles: Map<string, { data: Buffer; mime: string }>,
+    req: {
+      method: string;
+      url: URL;
+      body: Readable;
+      headers: Record<string, string | string[] | undefined>;
+    },
+  ): Promise<{
+    status?: number;
+    body: unknown;
+    headers?: Record<string, string>;
+  }> {
+    if (
+      req.method !== 'GET' &&
+      req.method !== 'POST' &&
+      req.method !== 'PUT' &&
+      req.method !== 'DELETE'
+    ) {
+      return Yedra.errorResponse(405, `Method \`${req.method}\` not allowed.`);
+    }
+    const match = this.matchRestRoute(req.url.pathname, req.method);
+    if (!match.result) {
+      // no matching route found
+      if (req.method === 'GET') {
+        // look for a static file
+        const staticFile =
+          staticFiles.get(req.url.pathname) ?? staticFiles.get('__fallback');
+        if (staticFile !== undefined) {
+          return {
+            status: 200,
+            body: staticFile.data,
+            headers: {
+              'content-type': staticFile.mime,
+            },
+          };
+        }
+      }
+      if (match.invalidMethod) {
+        // we found a route, but it did not match the request method
+        return Yedra.errorResponse(
+          405,
+          `Method ${req.method} not allowed for path \`${req.url.pathname}\`.`,
+        );
+      }
+      return Yedra.errorResponse(
+        404,
+        `Path \`${req.url.pathname}\` not found.`,
+      );
+    }
+    try {
+      // TODO: we aren't handling HTTP errors correctly here, are we?
+      return await match.result.endpoint.handle({
+        url: req.url.pathname,
+        body: req.body,
+        params: match.result.params,
+        query: Object.fromEntries(req.url.searchParams),
+        headers: Object.fromEntries(
+          Object.entries(req.headers).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? value.join(',') : (value ?? ''),
+          ]),
+        ),
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return Yedra.errorResponse(error.status, error.message);
+      }
+      console.error(error);
+      return Yedra.errorResponse(500, 'Internal Server Error.');
+    }
+  }
+
+  public async listen(
     port: number,
-    options?: { tls?: { key: string; cert: string } },
-  ): Context {
+    options?: {
+      tls?: { key: string; cert: string };
+      metrics?: {
+        port: number;
+        path: string;
+        get?: () => Promise<string> | string;
+      };
+      static?: { dir: string; fallback?: string };
+    },
+  ): Promise<Context> {
+    const staticFiles = await Yedra.loadStatic(options?.static);
     const server =
       options?.tls === undefined
         ? createHttpServer()
@@ -194,34 +207,34 @@ export class Yedra {
             key: options.tls.key,
             cert: options.tls.cert,
           });
-    server.on('request', (req, res) => {
+    server.on('request', async (req, res) => {
       const url = new URL(req.url as string, 'http://localhost');
       const begin = Date.now();
-      const chunks: Buffer[] = [];
-      req.on('data', (chunk) => {
-        chunks.push(chunk);
+      const response = await this.performRequest(staticFiles, {
+        method: req.method ?? 'GET',
+        url,
+        body: req,
+        headers: req.headers,
       });
-      req.on('end', async () => {
-        const body = chunks.length > 0 ? Buffer.concat(chunks) : undefined;
-        const response = await this.fetch(url, {
-          method: req.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
-          body:
-            req.method === 'POST' || req.method === 'PUT' ? body : undefined,
-          headers: Object.fromEntries(
-            Object.entries(req.headers).map(([key, value]) => [
-              key,
-              Array.isArray(value) ? value.join(',') : (value ?? ''),
-            ]),
-          ),
-        });
-        res.writeHead(response.status, Object.fromEntries(response.headers));
-        res.end(Buffer.from(await response.arrayBuffer()));
-        const duration = Date.now() - begin;
-        console.log(
-          `${req.method} ${url.pathname} -> ${response.status} (${duration}ms)`,
-        );
-        this.track(req.method as string, response.status, duration / 1000);
-      });
+      const status = response.status ?? 200;
+      res.writeHead(status, response.headers);
+      if (response.body instanceof ReadableStream) {
+        for await (const chunk of response.body) {
+          res.write(chunk);
+        }
+      } else {
+        const buffer =
+          response.body instanceof Uint8Array
+            ? response.body
+            : JSON.stringify(response.body);
+        res.write(buffer);
+      }
+      res.end();
+      const duration = Date.now() - begin;
+      console.log(
+        `${req.method} ${url.pathname} -> ${response.status} (${duration}ms)`,
+      );
+      this.track(req.method as string, status, duration / 1000);
     });
     const wss = new WebSocketServer({ server });
     wss.on('connection', async (ws, req) => {
@@ -244,8 +257,8 @@ export class Yedra {
     server.listen(port, () => {
       console.log(`yedra listening on http://localhost:${port}`);
     });
-    const metricsEndpoint = this.metricsEndpoint;
-    if (metricsEndpoint !== undefined) {
+    if (options?.metrics !== undefined) {
+      const metricsEndpoint = options.metrics;
       const metricsServer = createHttpServer();
       metricsServer.on('request', async (req, res) => {
         if (req.method === 'GET' && req.url === metricsEndpoint.path) {
@@ -269,16 +282,17 @@ export class Yedra {
     return new Context(server);
   }
 
-  private static errorResponse(status: number, errorMessage: string) {
-    return Response.json(
-      {
+  private static errorResponse(
+    status: number,
+    errorMessage: string,
+  ): { status?: number; body: unknown; headers?: Record<string, string> } {
+    return {
+      status,
+      body: {
         status,
         errorMessage,
       },
-      {
-        status,
-      },
-    );
+    };
   }
 
   private matchRestRoute(
