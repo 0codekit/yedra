@@ -115,9 +115,7 @@ class ConcreteRestEndpoint<
       );
     } catch (error) {
       if (error instanceof SyntaxError) {
-        issues.push(
-          new Issue('invalidSyntax', ['body'], 'JSON', error.message),
-        );
+        issues.push(new Issue(['body'], error.message));
       } else if (error instanceof ValidationError) {
         issues.push(...error.withPrefix('body'));
       } else {

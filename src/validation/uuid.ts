@@ -6,7 +6,7 @@ class UuidSchema extends ModifiableSchema<string> {
   public override parse(obj: unknown): string {
     if (typeof obj !== 'string' || !validate(obj) || version(obj) !== 4) {
       throw new ValidationError([
-        new Issue('invalidType', [], 'uuid', typeof obj),
+        new Issue([], `Expected uuid but got ${typeof obj}`),
       ]);
     }
     return obj;

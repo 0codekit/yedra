@@ -13,7 +13,7 @@ class StringSchema extends ModifiableSchema<string> {
   public override parse(obj: unknown): string {
     if (typeof obj !== 'string') {
       throw new ValidationError([
-        new Issue('invalidType', [], 'string', typeof obj),
+        new Issue([], `Expected string but got ${typeof obj}`),
       ]);
     }
     return obj;
@@ -37,12 +37,15 @@ class PatternStringSchema extends ModifiableSchema<string> {
   public override parse(obj: unknown): string {
     if (typeof obj !== 'string') {
       throw new ValidationError([
-        new Issue('invalidType', [], 'string', typeof obj),
+        new Issue([], `Expected string but got ${typeof obj}`),
       ]);
     }
     if (!obj.match(this.pattern)) {
       throw new ValidationError([
-        new Issue('invalidPattern', [], this.pattern.source, obj),
+        new Issue(
+          [],
+          `\`${obj}\` does not match pattern /${this.pattern.source}/`,
+        ),
       ]);
     }
     return obj;

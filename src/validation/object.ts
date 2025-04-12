@@ -24,10 +24,12 @@ export class ObjectSchema<
   }>
 > {
   private shape: Shape;
+  private lax: boolean;
 
-  public constructor(shape: Shape) {
+  public constructor(shape: Shape, lax: boolean) {
     super();
     this.shape = shape;
+    this.lax = lax;
   }
 
   public override parse(obj: unknown): MakeFieldsOptional<{
@@ -35,12 +37,12 @@ export class ObjectSchema<
   }> {
     if (typeof obj !== 'object') {
       throw new ValidationError([
-        new Issue('invalidType', [], 'object', typeof obj),
+        new Issue([], `Expected object but got ${typeof obj}`),
       ]);
     }
     if (obj == null) {
       throw new ValidationError([
-        new Issue('invalidType', [], 'object', 'null'),
+        new Issue([], 'Expected object but got null'),
       ]);
     }
     const result = {} as {
@@ -51,7 +53,7 @@ export class ObjectSchema<
       const propSchema = this.shape[prop];
       if (propSchema instanceof Schema) {
         if (!(prop in obj || propSchema.isOptional())) {
-          issues.push(new Issue('missingProperty', [prop], prop, ''));
+          issues.push(new Issue([prop], 'Required'));
           continue;
         }
         try {
@@ -63,6 +65,14 @@ export class ObjectSchema<
             throw error;
           }
         }
+      }
+    }
+    if (!this.lax) {
+      for (const prop in obj) {
+        if (prop in this.shape) {
+          continue;
+        }
+        issues.push(new Issue([prop], 'Unrecognized'));
       }
     }
     if (issues.length > 0) {
@@ -103,4 +113,8 @@ export class ObjectSchema<
  */
 export const object = <Shape extends Record<string, Schema<unknown>>>(
   shape: Shape,
-): ObjectSchema<Shape> => new ObjectSchema(shape);
+): ObjectSchema<Shape> => new ObjectSchema(shape, false);
+
+export const laxObject = <Shape extends Record<string, Schema<unknown>>>(
+  shape: Shape,
+): ObjectSchema<Shape> => new ObjectSchema(shape, true);

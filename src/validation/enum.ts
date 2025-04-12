@@ -17,14 +17,12 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
       (typeof obj !== 'string' && typeof obj !== 'number') ||
       !this.options.includes(obj)
     ) {
+      const actual =
+        typeof obj === 'string' || typeof obj === 'number' ? obj : typeof obj;
       throw new ValidationError([
         new Issue(
-          'invalidType',
           [],
-          this.options.join(', '),
-          typeof obj === 'string' || typeof obj === 'number'
-            ? obj.toString()
-            : typeof obj,
+          `Expected one of ${this.options.join(', ')} but got ${actual}`,
         ),
       ]);
     }

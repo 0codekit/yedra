@@ -6,13 +6,18 @@ import { Issue, ValidationError } from './error.js';
  */
 export abstract class Schema<T> extends BodyType<T> {
   public deserialize(buffer: Uint8Array, contentType: string): T {
-    if (contentType !== 'application/json' && buffer.length > 0) {
+    if (buffer.length === 0) {
+      return this.parse({});
+    }
+    if (contentType !== 'application/json') {
       throw new ValidationError([
-        new Issue('invalidContentType', [], 'application/json', contentType),
+        new Issue(
+          [],
+          `Expected content type \`application/json\`, but got \`${contentType}\``,
+        ),
       ]);
     }
-    const data =
-      buffer.length > 0 ? JSON.parse(Buffer.from(buffer).toString('utf8')) : {};
+    const data = JSON.parse(Buffer.from(buffer).toString('utf8'));
     return this.parse(data);
   }
 

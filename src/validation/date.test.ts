@@ -15,6 +15,6 @@ test('Validate Date', () => {
     new Date('Tue May 14 2024 14:33:04 GMT+0200 (Central European Summer Time'),
   );
   expect(() => schema.parse('hello world')).toThrow(
-    `Error at '': Expected 'date' but got 'string'.`,
+    'Error at ``: Expected date but got string.',
   );
 });

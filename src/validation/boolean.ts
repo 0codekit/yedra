@@ -11,7 +11,7 @@ class BooleanSchema extends ModifiableSchema<boolean> {
     }
     if (typeof obj !== 'boolean') {
       throw new ValidationError([
-        new Issue('invalidType', [], 'boolean', typeof obj),
+        new Issue([], `Expected boolean but got ${typeof obj}`),
       ]);
     }
     return obj;

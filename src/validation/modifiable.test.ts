@@ -7,6 +7,6 @@ test('Validate Optional', () => {
   expect(schema.parse(3)).toStrictEqual(3);
   expect(schema.parse(undefined)).toBeUndefined();
   expect(() => schema.parse('hello')).toThrow(
-    `Error at '': Expected 'number' but got 'string'.`,
+    'Error at ``: Expected number but got string.',
   );
 });

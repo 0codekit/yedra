@@ -3,9 +3,9 @@ import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 import type { Schema } from './schema.js';
 
-class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
-  Typeof<ItemSchema>[]
-> {
+export class ArraySchema<
+  ItemSchema extends Schema<unknown>,
+> extends ModifiableSchema<Typeof<ItemSchema>[]> {
   private readonly itemSchema: ItemSchema;
   private readonly minItems?: number;
   private readonly maxItems?: number;
@@ -49,26 +49,22 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
   public parse(obj: unknown): Typeof<ItemSchema>[] {
     if (!Array.isArray(obj)) {
       throw new ValidationError([
-        new Issue('invalidType', [], 'array', typeof obj),
+        new Issue([], `Expected array but got ${typeof obj}`),
       ]);
     }
     if (this.minItems && obj.length < this.minItems) {
       throw new ValidationError([
         new Issue(
-          'tooShort',
           [],
-          this.minItems.toString(),
-          obj.length.toString(),
+          `Must have at least ${this.minItems} items, but has ${obj.length}`,
         ),
       ]);
     }
     if (this.maxItems && obj.length > this.maxItems) {
       throw new ValidationError([
         new Issue(
-          'tooLong',
           [],
-          this.maxItems.toString(),
-          obj.length.toString(),
+          `Must have at most ${this.maxItems} items, but has ${obj.length}`,
         ),
       ]);
     }
@@ -104,6 +100,7 @@ class ArraySchema<ItemSchema extends Schema<unknown>> extends ModifiableSchema<
 /**
  * A schema matching arrays of the provided item type.
  * @param itemSchema - The schema for array items.
+ * @deprecated Use the .array() method instead.
  */
 export const array = <ItemSchema extends Schema<unknown>>(
   itemSchema: ItemSchema,

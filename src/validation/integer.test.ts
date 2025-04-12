@@ -10,13 +10,13 @@ test('Validate Integer', () => {
   expect(schema.parse(100)).toStrictEqual(100);
   expect(schema.parse('100')).toStrictEqual(100);
   expect(() => schema.parse('hello')).toThrow(
-    `Error at '': Expected 'integer' but got 'string'.`,
+    'Error at ``: Expected integer but got string.',
   );
   expect(() => schema.parse('1.3')).toThrow(
-    `Error at '': Expected 'integer' but got 'string'.`,
+    'Error at ``: Expected integer but got string.',
   );
   expect(() => schema.parse(5.3)).toThrow(
-    `Error at '': Expected 'integer' but got 'number'.`,
+    'Error at ``: Expected integer but got number.',
   );
 });
 
@@ -28,7 +28,7 @@ test('Validate Integer Min', () => {
   });
   expect(schema.parse(10)).toStrictEqual(10);
   expect(() => schema.parse(9)).toThrow(
-    `Error at '': Must be at least '10' but was '9'.`,
+    'Error at ``: Must be at least 10, but was 9.',
   );
 });
 
@@ -40,6 +40,6 @@ test('Validate Integer Max', () => {
   });
   expect(schema.parse(100)).toStrictEqual(100);
   expect(() => schema.parse(101)).toThrow(
-    `Error at '': Must be at most '100' but was '101'.`,
+    'Error at ``: Must be at most 100, but was 101.',
   );
 });
