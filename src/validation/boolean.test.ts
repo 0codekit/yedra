@@ -8,6 +8,9 @@ test('Validate Boolean', () => {
     type: 'boolean',
   });
   expect(schema.parse(true)).toBeTrue();
+  expect(schema.parse('true')).toBeTrue();
+  expect(schema.parse(false)).toBeFalse();
+  expect(schema.parse('false')).toBeFalse();
   expect(() => schema.parse('hello')).toThrow(
     'Error at ``: Expected boolean but got string.',
   );
