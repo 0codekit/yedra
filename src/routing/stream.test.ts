@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
+import { stream } from '../lib';
 import { Yedra } from './app';
 import { Post } from './rest';
-import { stream } from '../lib';
 
 const app = new Yedra().use(
   '/stream',

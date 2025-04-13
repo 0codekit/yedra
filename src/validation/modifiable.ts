@@ -24,7 +24,7 @@ export abstract class ModifiableSchema<T> extends Schema<T> {
   }
 
   public array(): ArraySchema<Schema<T>> {
-    return new ActualArraySchema(this);
+    return new ArraySchemaModule.ArraySchema(this);
   }
 }
 
@@ -53,7 +53,7 @@ class OptionalSchema<T> extends Schema<T | undefined> {
   }
 
   public array(): ArraySchema<Schema<T | undefined>> {
-    return new ActualArraySchema(this);
+    return new ArraySchemaModule.ArraySchema(this);
   }
 
   public override parse(obj: unknown): T | undefined {
@@ -72,4 +72,4 @@ class OptionalSchema<T> extends Schema<T | undefined> {
   }
 }
 
-const ActualArraySchema = (await import('./array.js')).ArraySchema;
+const ArraySchemaModule = await import('./array.js');

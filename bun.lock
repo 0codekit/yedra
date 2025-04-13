@@ -122,11 +122,18 @@
       "sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg=="
     ],
 
-    "bun-types": [
-      "bun-types@1.2.10",
+    "bufferutil": [
+      "bufferutil@4.0.9",
       "",
-      { "dependencies": { "@types/node": "*" } },
-      "sha512-b5ITZMnVdf3m1gMvJHG+gIfeJHiQPJak0f7925Hxu6ZN5VKA8AGy4GZ4lM+Xkn6jtWxg5S3ldWvfmXdvnkp3GQ=="
+      { "dependencies": { "node-gyp-build": "^4.3.0" } },
+      "sha512-WDtdLmJvAuNNPzByAYpRo2rF1Mmradw6gvWsQKf63476DDXmomT9zUiGypLcG4ibIM67vhAj8jJRdbmEws2Aqw=="
+    ],
+
+    "bun-types": [
+      "bun-types@1.2.9",
+      "",
+      { "dependencies": { "@types/node": "*", "@types/ws": "*" } },
+      "sha512-dk/kOEfQbajENN/D6FyiSgOKEuUi9PWfqKQJEgwKrCMWbjS/S6tEXp178mWvWAcUSYm9ArDlWHZKO3T/4cLXiw=="
     ],
 
     "mime": [
@@ -134,6 +141,19 @@
       "",
       { "bin": { "mime": "bin/cli.js" } },
       "sha512-2OfDPL+e03E0LrXaGYOtTFIYhiuzep94NSsuhrNULq+stylcJedcHdzHtz0atMUuGwJfFYs0YL5xeC/Ca2x0eQ=="
+    ],
+
+    "node-gyp-build": [
+      "node-gyp-build@4.8.4",
+      "",
+      {
+        "bin": {
+          "node-gyp-build": "bin.js",
+          "node-gyp-build-optional": "optional.js",
+          "node-gyp-build-test": "build-test.js"
+        }
+      },
+      "sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ=="
     ],
 
     "typescript": [

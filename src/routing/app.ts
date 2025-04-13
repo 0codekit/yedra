@@ -7,6 +7,7 @@ import type { Readable } from 'node:stream';
 import { URL } from 'node:url';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
+import { Counter } from '../util/counter.js';
 import type { SecurityScheme } from '../util/security.js';
 import { HttpError } from './errors.js';
 import { Path } from './path.js';
@@ -14,15 +15,29 @@ import { RestEndpoint } from './rest.js';
 import { WsEndpoint } from './websocket.js';
 
 class Context {
-  private server: Server;
+  private readonly server: Server;
+  private readonly wss: WebSocketServer;
+  private readonly counter: Counter;
 
-  public constructor(server: Server) {
+  public constructor(server: Server, wss: WebSocketServer, counter: Counter) {
     this.server = server;
+    this.wss = wss;
+    this.counter = counter;
   }
 
   public stop(): Promise<void> {
     return new Promise((resolve) => {
-      this.server.close(() => resolve());
+      // don't accept any new connections
+      this.wss.close();
+      this.server.close();
+      for (const client of this.wss.clients) {
+        // send shutdown message to all WebSocket clients
+        client.close(1000, 'Server Shutdown');
+      }
+      // wait until all connections are done
+      this.counter.wait().then(() => {
+        resolve();
+      });
     });
   }
 }
@@ -210,7 +225,9 @@ export class Yedra {
             key: options.tls.key,
             cert: options.tls.cert,
           });
+    const counter = new Counter();
     server.on('request', async (req, res) => {
+      counter.increment();
       const url = new URL(req.url as string, 'http://localhost');
       const begin = Date.now();
       const response = await this.performRequest(staticFiles, {
@@ -240,6 +257,7 @@ export class Yedra {
         );
       }
       this.track(req.method as string, status, duration / 1000);
+      counter.decrement();
     });
     const wss = new WebSocketServer({ server });
     wss.on('connection', async (ws, req) => {
@@ -255,7 +273,8 @@ export class Yedra {
         if (error instanceof HttpError) {
           ws.close(4000 + error.status, error.message);
         } else {
-          ws.close(1011, 'Internal Server Error');
+          console.error(error);
+          ws.close(1011, 'Internal Error');
         }
       }
     });
@@ -288,7 +307,7 @@ export class Yedra {
         });
       }
     }
-    return new Context(server);
+    return new Context(server, wss, counter);
   }
 
   private static errorResponse(
