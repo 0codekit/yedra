@@ -299,13 +299,13 @@ export class Yedra {
           res.end('Not found');
         }
       });
-      if (options.quiet !== true) {
-        metricsServer.listen(metricsEndpoint.port, () => {
+      metricsServer.listen(metricsEndpoint.port, () => {
+        if (options.quiet !== true) {
           console.log(
             `yedra metrics on http://localhost:${metricsEndpoint.port}${metricsEndpoint.path}`,
           );
-        });
-      }
+        }
+      });
     }
     return new Context(server, wss, counter);
   }

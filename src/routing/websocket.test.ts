@@ -54,7 +54,6 @@ test('WebSocket', async () => {
       ws.onclose = (e) => resolve({ code: e.code, reason: e.reason });
     },
   );
-  console.log(reason);
   expect(code).toBe(1000);
   expect(reason).toBe('Server Shutdown');
 });
