@@ -250,10 +250,11 @@ export class Yedra {
       metricsServer.on('request', async (req, res) => {
         if (req.method === 'GET' && req.url === metricsEndpoint.path) {
           res.writeHead(200);
+          res.write(this.generateMetrics());
           if (metricsEndpoint.get !== undefined) {
             res.write(await metricsEndpoint.get());
           }
-          res.end(this.generateMetrics());
+          res.end();
         } else {
           res.writeHead(404);
           res.end('Not found');
