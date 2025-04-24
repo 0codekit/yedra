@@ -25,6 +25,12 @@ class Context {
   }
 }
 
+type MetricsConfig = {
+  port: number;
+  path: string;
+  get?: () => Promise<string>;
+};
+
 export class Yedra {
   private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
   private wsRoutes: { path: Path; endpoint: WsEndpoint }[] = [];
@@ -33,9 +39,9 @@ export class Yedra {
     string,
     { count: number; duration: number } | undefined
   > = {};
-  private readonly metricsEndpoint: { port: number; path: string } | undefined;
+  private readonly metricsEndpoint: MetricsConfig | undefined;
 
-  public constructor(options?: { metrics: { port: number; path: string } }) {
+  public constructor(options?: { metrics: MetricsConfig }) {
     this.metricsEndpoint = options?.metrics;
   }
 
@@ -241,9 +247,12 @@ export class Yedra {
     const metricsEndpoint = this.metricsEndpoint;
     if (metricsEndpoint !== undefined) {
       const metricsServer = createHttpServer();
-      metricsServer.on('request', (req, res) => {
+      metricsServer.on('request', async (req, res) => {
         if (req.method === 'GET' && req.url === metricsEndpoint.path) {
           res.writeHead(200);
+          if (metricsEndpoint.get !== undefined) {
+            res.write(await metricsEndpoint.get());
+          }
           res.end(this.generateMetrics());
         } else {
           res.writeHead(404);
