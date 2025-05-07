@@ -1,9 +1,10 @@
+import type { Readable } from 'node:stream';
 import { paramDocs } from '../util/docs.js';
 import type { SecurityScheme } from '../util/security.js';
 import type { BodyType, Typeof } from '../validation/body.js';
 import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
-import { type ObjectSchema, object } from '../validation/object.js';
+import { type ObjectSchema, laxObject, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import { BadRequestError } from './errors.js';
 
@@ -55,13 +56,17 @@ type EndpointOptions<
 
 export abstract class RestEndpoint {
   abstract get method(): 'GET' | 'POST' | 'PUT' | 'DELETE';
-  abstract handle(
-    pathname: string,
-    body: string | Buffer,
-    params: Record<string, string>,
-    query: Record<string, string>,
-    headers: Record<string, string>,
-  ): Promise<Response>;
+  abstract handle(req: {
+    url: string;
+    body: Readable;
+    params: Record<string, string>;
+    query: Record<string, string>;
+    headers: Record<string, string>;
+  }): Promise<{
+    status?: number;
+    body: unknown;
+    headers?: Record<string, string>;
+  }>;
   abstract documentation(
     securitySchemes: Record<string, SecurityScheme>,
   ): object;
@@ -89,35 +94,38 @@ class ConcreteRestEndpoint<
     this.options = options;
     this.paramsSchema = object(options.params);
     this.querySchema = object(options.query);
-    this.headersSchema = object(options.headers);
+    // headers need to be lax, since there are lots of them
+    this.headersSchema = laxObject(options.headers);
   }
 
   public get method(): 'GET' | 'POST' | 'PUT' | 'DELETE' {
     return this._method;
   }
 
-  public async handle(
-    url: string,
-    body: string | Buffer,
-    params: Record<string, string>,
-    query: Record<string, string>,
-    headers: Record<string, string>,
-  ): Promise<Response> {
+  public async handle(req: {
+    url: string;
+    body: Readable;
+    params: Record<string, string>;
+    query: Record<string, string>;
+    headers: Record<string, string>;
+  }): Promise<{
+    status?: number;
+    body: unknown;
+    headers?: Record<string, string>;
+  }> {
     let parsedBody: Typeof<Req>;
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
     const issues: Issue[] = [];
     try {
-      parsedBody = this.options.req.deserialize(
-        typeof body === 'string' ? Buffer.from(body) : body,
-        headers['content-type'] ?? 'application/octet-stream',
+      parsedBody = await this.options.req.deserialize(
+        req.body,
+        req.headers['content-type'] ?? 'application/octet-stream',
       );
     } catch (error) {
       if (error instanceof SyntaxError) {
-        issues.push(
-          new Issue('invalidSyntax', ['body'], 'JSON', error.message),
-        );
+        issues.push(new Issue(['body'], error.message));
       } else if (error instanceof ValidationError) {
         issues.push(...error.withPrefix('body'));
       } else {
@@ -125,7 +133,7 @@ class ConcreteRestEndpoint<
       }
     }
     try {
-      parsedParams = this.paramsSchema.parse(params);
+      parsedParams = this.paramsSchema.parse(req.params);
     } catch (error) {
       if (error instanceof ValidationError) {
         issues.push(...error.withPrefix('params'));
@@ -134,7 +142,7 @@ class ConcreteRestEndpoint<
       }
     }
     try {
-      parsedQuery = this.querySchema.parse(query);
+      parsedQuery = this.querySchema.parse(req.query);
     } catch (error) {
       if (error instanceof ValidationError) {
         issues.push(...error.withPrefix('query'));
@@ -143,7 +151,7 @@ class ConcreteRestEndpoint<
       }
     }
     try {
-      parsedHeaders = this.headersSchema.parse(headers);
+      parsedHeaders = this.headersSchema.parse(req.headers);
     } catch (error) {
       if (error instanceof ValidationError) {
         issues.push(...error.withPrefix('headers'));
@@ -155,8 +163,8 @@ class ConcreteRestEndpoint<
       const error = new ValidationError(issues);
       throw new BadRequestError(error.format());
     }
-    const response = await this.options.do({
-      url,
+    return await this.options.do({
+      url: req.url,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       params: parsedParams!,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
@@ -165,16 +173,6 @@ class ConcreteRestEndpoint<
       headers: parsedHeaders!,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       body: parsedBody!,
-    });
-    if (response.body instanceof Uint8Array) {
-      return new Response(response.body, {
-        status: response.status,
-        headers: response.headers,
-      });
-    }
-    return Response.json(response.body, {
-      status: response.status,
-      headers: response.headers,
     });
   }
 

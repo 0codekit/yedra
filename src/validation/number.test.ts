@@ -10,7 +10,7 @@ test('Validate Number', () => {
   expect(schema.parse(100)).toStrictEqual(100);
   expect(schema.parse('100')).toStrictEqual(100);
   expect(() => schema.parse('hello')).toThrow(
-    `Error at '': Expected 'number' but got 'string'.`,
+    'Error at ``: Expected number but got string.',
   );
 });
 
@@ -22,7 +22,7 @@ test('Validate Number Min', () => {
   });
   expect(schema.parse(10)).toStrictEqual(10);
   expect(() => schema.parse(9)).toThrow(
-    `Error at '': Must be at least '10' but was '9'.`,
+    'Error at ``: Must be at least 10, but was 9.',
   );
 });
 
@@ -34,6 +34,6 @@ test('Validate Number Max', () => {
   });
   expect(schema.parse(100)).toStrictEqual(100);
   expect(() => schema.parse(101)).toThrow(
-    `Error at '': Must be at most '100' but was '101'.`,
+    'Error at ``: Must be at most 100, but was 101.',
   );
 });

@@ -14,9 +14,14 @@ class RecordSchema<
   }
 
   public parse(obj: unknown): Record<string, Typeof<ValueSchema> | undefined> {
-    if (!obj || typeof obj !== 'object') {
+    if (typeof obj !== 'object') {
       throw new ValidationError([
-        new Issue('invalidType', [], 'object', typeof obj),
+        new Issue([], `Expected object but got ${typeof obj}`),
+      ]);
+    }
+    if (obj === null) {
+      throw new ValidationError([
+        new Issue([], 'Expected object but got null'),
       ]);
     }
     const result: Record<string, Typeof<ValueSchema>> = {};

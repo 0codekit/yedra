@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream';
 import { BodyType, type Typeof } from './body.js';
 import { ValidationError } from './error.js';
 
@@ -12,13 +13,13 @@ class EitherBody<T extends [...BodyType<unknown>[]]> extends BodyType<
   }
 
   public deserialize(
-    buffer: Uint8Array,
+    stream: Readable,
     contentType: string,
-  ): Typeof<T[number]> {
+  ): Promise<Typeof<T[number]>> {
     const issues = [];
     for (const option of this.options) {
       try {
-        return option.deserialize(buffer, contentType);
+        return option.deserialize(stream, contentType);
       } catch (error) {
         if (error instanceof ValidationError) {
           issues.push(...error.issues);

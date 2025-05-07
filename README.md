@@ -111,9 +111,7 @@ export const loginEndpoint = new Post({
     password: y.string(),
   }),
   res: y.object({
-    token: y.string().doc({
-      description: "The session token.",
-    }),
+    token: y.string().describe("The session token."),
   }),
   async do(req) {
     if (await isValid(req.body.username, req.body.password)) {

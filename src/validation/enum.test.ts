@@ -12,9 +12,9 @@ test('Validate Enum', () => {
   expect(schema.parse(4)).toStrictEqual(4);
   expect(schema.parse('hello')).toStrictEqual('hello');
   expect(() => schema.parse('world')).toThrow(
-    `Error at '': Expected '3, 4, hello' but got 'world'.`,
+    'Error at ``: Expected one of 3, 4, hello but got world.',
   );
   expect(() => schema.parse(5)).toThrow(
-    `Error at '': Expected '3, 4, hello' but got '5'.`,
+    'Error at ``: Expected one of 3, 4, hello but got 5.',
   );
 });

@@ -17,6 +17,6 @@ test('Validate Record', () => {
   });
   expect(result).toStrictEqual({ hello: 3, world: 4 });
   expect(() => schema.parse({ hello: 'world' })).toThrow(
-    `Error at 'hello': Expected 'number' but got 'string'.`,
+    'Error at `hello`: Expected number but got string.',
   );
 });

@@ -19,6 +19,6 @@ test('Validate Union', () => {
   expect(schema.parse(3)).toStrictEqual(3);
   expect(schema.parse('hello')).toStrictEqual('hello');
   expect(() => schema.parse({})).toThrow(
-    `Error at '': Expected 'string' but got 'object'. Error at '': Expected 'number' but got 'object'.`,
+    'Error at ``: Expected string but got object. Error at ``: Expected number but got object.',
   );
 });

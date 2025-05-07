@@ -14,7 +14,7 @@ class DateSchema extends ModifiableSchema<Date> {
       }
     }
     throw new ValidationError([
-      new Issue('invalidType', [], 'date', typeof obj),
+      new Issue([], `Expected date but got ${typeof obj}`),
     ]);
   }
 

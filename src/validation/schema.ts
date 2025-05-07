@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream';
+import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
 import { Issue, ValidationError } from './error.js';
 
@@ -5,14 +7,20 @@ import { Issue, ValidationError } from './error.js';
  * The base class for all schemas.
  */
 export abstract class Schema<T> extends BodyType<T> {
-  public deserialize(buffer: Uint8Array, contentType: string): T {
-    if (contentType !== 'application/json' && buffer.length > 0) {
+  public async deserialize(stream: Readable, contentType: string): Promise<T> {
+    const buffer = await readableToBuffer(stream);
+    if (buffer.length === 0) {
+      return this.parse({});
+    }
+    if (contentType !== 'application/json') {
       throw new ValidationError([
-        new Issue('invalidContentType', [], 'application/json', contentType),
+        new Issue(
+          [],
+          `Expected content type \`application/json\`, but got \`${contentType}\``,
+        ),
       ]);
     }
-    const data =
-      buffer.length > 0 ? JSON.parse(Buffer.from(buffer).toString('utf8')) : {};
+    const data = JSON.parse(Buffer.from(buffer).toString('utf8'));
     return this.parse(data);
   }
 

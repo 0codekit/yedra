@@ -36,23 +36,23 @@ class IntegerSchema extends ModifiableSchema<number> {
   public override parse(obj: unknown): number {
     if (typeof obj !== 'number' && typeof obj !== 'string') {
       throw new ValidationError([
-        new Issue('invalidType', [], 'number', typeof obj),
+        new Issue([], `Expected number but got ${typeof obj}`),
       ]);
     }
     const num = typeof obj === 'number' ? obj : Number.parseFloat(obj);
     if (Number.isNaN(num) || !Number.isInteger(num)) {
       throw new ValidationError([
-        new Issue('invalidType', [], 'integer', typeof obj),
+        new Issue([], `Expected integer but got ${typeof obj}`),
       ]);
     }
     if (this.minValue !== undefined && num < this.minValue) {
       throw new ValidationError([
-        new Issue('tooSmall', [], this.minValue.toString(), num.toString()),
+        new Issue([], `Must be at least ${this.minValue}, but was ${num}`),
       ]);
     }
     if (this.maxValue !== undefined && num > this.maxValue) {
       throw new ValidationError([
-        new Issue('tooBig', [], this.maxValue.toString(), num.toString()),
+        new Issue([], `Must be at most ${this.maxValue}, but was ${num}`),
       ]);
     }
     return num;

@@ -1,3 +1,4 @@
+import type { ArraySchema } from './array.js';
 import { DocSchema } from './doc.js';
 import { Schema } from './schema.js';
 
@@ -12,9 +13,18 @@ export abstract class ModifiableSchema<T> extends Schema<T> {
   /**
    * Add a description and example to the schema.
    * @param doc - The documentation.
+   * @deprecated - Use .describe() instead.
    */
   public doc(doc: { description: string; example?: T }): DocSchema<T> {
     return new DocSchema(this, doc.description, doc.example);
+  }
+
+  public describe(description: string, example?: T): DocSchema<T> {
+    return new DocSchema(this, description, example);
+  }
+
+  public array(): ArraySchema<Schema<T>> {
+    return new ArraySchemaModule.ArraySchema(this);
   }
 }
 
@@ -29,12 +39,21 @@ class OptionalSchema<T> extends Schema<T | undefined> {
   /**
    * Add a description and example to the schema.
    * @param doc - The documentation.
+   * @deprecated - Use .describe() instead.
    */
   public doc(doc: {
     description: string;
     example?: T;
   }): DocSchema<T | undefined> {
     return new DocSchema(this, doc.description, doc.example);
+  }
+
+  public describe(description: string, example?: T): DocSchema<T | undefined> {
+    return new DocSchema(this, description, example);
+  }
+
+  public array(): ArraySchema<Schema<T | undefined>> {
+    return new ArraySchemaModule.ArraySchema(this);
   }
 
   public override parse(obj: unknown): T | undefined {
@@ -52,3 +71,5 @@ class OptionalSchema<T> extends Schema<T | undefined> {
     return true;
   }
 }
+
+const ArraySchemaModule = await import('./array.js');

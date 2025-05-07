@@ -9,7 +9,7 @@ test('Validate String', () => {
   });
   expect(schema.parse('hello')).toStrictEqual('hello');
   expect(() => schema.parse(3)).toThrow(
-    `Error at '': Expected 'string' but got 'number'.`,
+    'Error at ``: Expected string but got number.',
   );
 });
 
@@ -22,9 +22,9 @@ test('Validate String Pattern', () => {
   });
   expect(schema.parse('123')).toStrictEqual('123');
   expect(() => schema.parse('hello')).toThrow(
-    `Error at '': 'hello' does not match pattern '^[0-9]+$'.`,
+    'Error at ``: `hello` does not match pattern /^[0-9]+$/.',
   );
   expect(() => schema.parse(3)).toThrow(
-    `Error at '': Expected 'string' but got 'number'.`,
+    'Error at ``: Expected string but got number.',
   );
 });

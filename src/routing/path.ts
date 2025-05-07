@@ -75,7 +75,10 @@ export class Path {
     path: string,
   ): { params: Record<string, string>; score: number } | undefined {
     const params: Record<string, string> = {};
-    const actual = path.substring(1).split('/');
+    const actual = path
+      .substring(1)
+      .split('/')
+      .filter((segment) => segment !== '');
     if (this.expected.length < actual.length && !this.expected.includes('*')) {
       // path cannot be longer than expected, unless it contains a wildcard
       return undefined;
