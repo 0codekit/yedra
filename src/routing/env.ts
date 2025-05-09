@@ -1,10 +1,13 @@
 import type { Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
+import { type ObjectSchema, laxObject } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 
-export const parseEnv = <T extends Schema<unknown>>(schema: T): Typeof<T> => {
+export const parseEnv = <T extends Record<string, Schema<unknown>>>(
+  shape: T,
+): Typeof<ObjectSchema<T>> => {
   try {
-    return schema.parse(process.env);
+    return laxObject(shape).parse(process.env);
   } catch (error) {
     if (error instanceof ValidationError) {
       console.error(`error: env validation failed: ${error.format()}`);

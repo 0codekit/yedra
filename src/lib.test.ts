@@ -1,5 +1,5 @@
 import { expect, jest, test } from 'bun:test';
-import { laxObject, parseEnv, string, validatePath } from './lib';
+import { parseEnv, string, validatePath } from './lib';
 
 test('Validate Path', () => {
   expect(() => validatePath('/test/abc')).not.toThrow();
@@ -10,12 +10,10 @@ test('Parse Env', () => {
   process.env.A = 'Hello';
   process.env.B = 'World';
   expect(
-    parseEnv(
-      laxObject({
-        A: string(),
-        B: string(),
-      }),
-    ),
+    parseEnv({
+      A: string(),
+      B: string(),
+    }),
   ).toEqual({
     A: 'Hello',
     B: 'World',
@@ -26,7 +24,7 @@ test('Parse Env', () => {
   const oldExit = process.exit;
   console.error = errorMock;
   process.exit = exitMock;
-  parseEnv(laxObject({ C: string() }));
+  parseEnv({ C: string() });
   expect(errorMock.mock.calls).toEqual([
     ['error: env validation failed: Error at `C`: Required.'],
   ]);
