@@ -94,6 +94,9 @@ test('Server Basic REST', async () => {
   const context = await app.listen(27534, { quiet: true });
   const response1 = await fetch('http://localhost:27534');
   expect(response1.status).toBe(200);
+  expect(response1.headers.get('content-type')).toStrictEqual(
+    'application/json',
+  );
   expect(await response1.json()).toStrictEqual({ a: 3 });
   const response2 = await fetch('http://localhost:27534/test', {
     method: 'POST',

@@ -237,17 +237,20 @@ export class Yedra {
         headers: req.headers,
       });
       const status = response.status ?? 200;
-      res.writeHead(status, response.headers);
       if (response.body instanceof ReadableStream) {
+        res.writeHead(status, response.headers);
         for await (const chunk of response.body) {
           res.write(chunk);
         }
+      } else if (response.body instanceof Uint8Array) {
+        res.writeHead(status, response.headers);
+        res.write(response.body);
       } else {
-        const buffer =
-          response.body instanceof Uint8Array
-            ? response.body
-            : JSON.stringify(response.body);
-        res.write(buffer);
+        res.writeHead(status, {
+          'content-type': 'application/json',
+          ...response.headers,
+        });
+        res.write(JSON.stringify(response.body));
       }
       res.end();
       const duration = Date.now() - begin;
