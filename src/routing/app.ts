@@ -1,5 +1,5 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import type { Server } from 'node:http';
+import type { IncomingMessage, OutgoingMessage, Server } from 'node:http';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { extname, join } from 'node:path';
@@ -41,6 +41,12 @@ class Context {
     });
   }
 }
+
+type ConnectMiddleware = (
+  req: IncomingMessage,
+  res: OutgoingMessage,
+  next: () => void,
+) => Promise<void>;
 
 export class Yedra {
   private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
@@ -201,6 +207,23 @@ export class Yedra {
     }
   }
 
+  private middlewareNext(
+    req: IncomingMessage,
+    res: OutgoingMessage,
+    middlewares: ConnectMiddleware[],
+    last: () => void,
+  ) {
+    if (middlewares.length > 0) {
+      // apply the next middleware
+      middlewares[0](req, res, () =>
+        this.middlewareNext(req, res, middlewares.slice(1), last),
+      );
+    } else {
+      // no middlewares left, invoke yedra
+      last();
+    }
+  }
+
   public async listen(
     port: number,
     options?: {
@@ -215,6 +238,10 @@ export class Yedra {
        * Prevents all normal output from Yedra. Mostly useful for tests.
        */
       quiet?: boolean;
+      /**
+       * Add Express/Connect compatible middleware.
+       */
+      connectMiddlewares?: ConnectMiddleware[];
     },
   ): Promise<Context> {
     const staticFiles = await Yedra.loadStatic(options?.static);
@@ -226,41 +253,50 @@ export class Yedra {
             cert: options.tls.cert,
           });
     const counter = new Counter();
-    server.on('request', async (req, res) => {
-      counter.increment();
-      const url = new URL(req.url as string, 'http://localhost');
-      const begin = Date.now();
-      const response = await this.performRequest(staticFiles, {
-        method: req.method ?? 'GET',
-        url,
-        body: req,
-        headers: req.headers,
-      });
-      const status = response.status ?? 200;
-      if (response.body instanceof ReadableStream) {
-        res.writeHead(status, response.headers);
-        for await (const chunk of response.body) {
-          res.write(chunk);
-        }
-      } else if (response.body instanceof Uint8Array) {
-        res.writeHead(status, response.headers);
-        res.write(response.body);
-      } else {
-        res.writeHead(status, {
-          'content-type': 'application/json',
-          ...response.headers,
-        });
-        res.write(JSON.stringify(response.body));
-      }
-      res.end();
-      const duration = Date.now() - begin;
-      if (options?.quiet !== true) {
-        console.log(
-          `${req.method} ${url.pathname} -> ${status} (${duration}ms)`,
-        );
-      }
-      this.track(req.method as string, status, duration / 1000);
-      counter.decrement();
+    server.on('request', (req, res) => {
+      // first, invoke the middleware chain
+      this.middlewareNext(
+        req,
+        res,
+        options?.connectMiddlewares ?? [],
+        async () => {
+          // this will be called after all middlewares are done
+          counter.increment();
+          const url = new URL(req.url as string, 'http://localhost');
+          const begin = Date.now();
+          const response = await this.performRequest(staticFiles, {
+            method: req.method ?? 'GET',
+            url,
+            body: req,
+            headers: req.headers,
+          });
+          const status = response.status ?? 200;
+          if (response.body instanceof ReadableStream) {
+            res.writeHead(status, response.headers);
+            for await (const chunk of response.body) {
+              res.write(chunk);
+            }
+          } else if (response.body instanceof Uint8Array) {
+            res.writeHead(status, response.headers);
+            res.write(response.body);
+          } else {
+            res.writeHead(status, {
+              'content-type': 'application/json',
+              ...response.headers,
+            });
+            res.write(JSON.stringify(response.body));
+          }
+          res.end();
+          const duration = Date.now() - begin;
+          if (options?.quiet !== true) {
+            console.log(
+              `${req.method} ${url.pathname} -> ${status} (${duration}ms)`,
+            );
+          }
+          this.track(req.method as string, status, duration / 1000);
+          counter.decrement();
+        },
+      );
     });
     const wss = new WebSocketServer({ server });
     wss.on('connection', async (ws, req) => {
