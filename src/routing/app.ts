@@ -51,7 +51,9 @@ type ServeResponse = {
   headers?: Record<string, string>;
 };
 
-type ServeFallback = () => ServeResponse | Promise<ServeResponse>;
+type ServeFallback = (req: { href: string }) =>
+  | ServeResponse
+  | Promise<ServeResponse>;
 
 type ServeConfig = {
   dir: string;
@@ -212,14 +214,22 @@ export class Yedra {
           };
         }
         if (serveData.fallback !== undefined) {
-          const response = await serveData.fallback();
-          return {
-            status: response.status ?? 200,
-            body: isUint8Array(response.body)
-              ? response.body
-              : Buffer.from(response.body, 'utf-8'),
-            headers: response.headers,
-          };
+          try {
+            const response = await serveData.fallback({ href: req.url.href });
+            return {
+              status: response.status ?? 200,
+              body: isUint8Array(response.body)
+                ? response.body
+                : Buffer.from(response.body, 'utf-8'),
+              headers: response.headers,
+            };
+          } catch (error) {
+            if (error instanceof HttpError) {
+              return Yedra.errorResponse(error.status, error.message);
+            }
+            console.error(error);
+            return Yedra.errorResponse(500, 'Internal Server Error.');
+          }
         }
       }
       if (match.invalidMethod) {
