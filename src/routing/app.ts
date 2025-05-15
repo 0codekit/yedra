@@ -46,7 +46,7 @@ type ConnectMiddleware = (
   req: IncomingMessage,
   res: ServerResponse,
   next: () => void,
-) => Promise<void>;
+) => void;
 
 export class Yedra {
   private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
