@@ -3,7 +3,7 @@ import { Yedra } from './app';
 
 test('Server Static Without Fallback', async () => {
   const context = await new Yedra().listen(27537, {
-    static: {
+    serve: {
       dir: 'test/static',
     },
     quiet: true,
@@ -22,7 +22,7 @@ test('Server Static Without Fallback', async () => {
 
 test('Server Static With Fallback', async () => {
   const context = await new Yedra().listen(27538, {
-    static: {
+    serve: {
       dir: 'test/static',
       fallback: 'test/static/main.html',
     },

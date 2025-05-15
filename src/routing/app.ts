@@ -5,6 +5,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import { extname, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { URL } from 'node:url';
+import { isUint8Array } from 'node:util/types';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
 import { Counter } from '../util/counter.js';
@@ -41,6 +42,26 @@ class Context {
     });
   }
 }
+
+type ServeFile = { data: Buffer; mime: string };
+
+type ServeResponse = {
+  status?: number;
+  body: Uint8Array | string;
+  headers?: Record<string, string>;
+};
+
+type ServeFallback = () => ServeResponse | Promise<ServeResponse>;
+
+type ServeConfig = {
+  dir: string;
+  fallback?: string | ServeFallback;
+};
+
+type ServeData = {
+  files: Map<string, ServeFile>;
+  fallback: ServeFallback | undefined;
+};
 
 type ConnectMiddleware = (
   req: IncomingMessage,
@@ -103,17 +124,20 @@ export class Yedra {
     };
   }
 
-  private static async loadStatic(
-    options: { dir: string; fallback?: string } | undefined,
-  ): Promise<Map<string, { data: Buffer; mime: string }>> {
-    if (options === undefined) {
-      return new Map();
+  private static async loadServe(
+    config: ServeConfig | undefined,
+  ): Promise<ServeData> {
+    if (config === undefined) {
+      return {
+        files: new Map(),
+        fallback: undefined,
+      };
     }
-    const staticFiles = new Map<string, { data: Buffer; mime: string }>();
-    const files = await readdir(options.dir, { recursive: true });
+    const staticFiles = new Map<string, ServeFile>();
+    const files = await readdir(config.dir, { recursive: true });
     await Promise.all(
       files.map(async (file) => {
-        const absolute = join(options.dir, file);
+        const absolute = join(config.dir, file);
         if (!(await stat(absolute)).isFile()) {
           return;
         }
@@ -124,19 +148,33 @@ export class Yedra {
         });
       }),
     );
-    if (options.fallback) {
-      const data = await readFile(options.fallback);
-      staticFiles.set('__fallback', {
-        data,
-        mime:
-          mime.getType(extname(options.fallback)) ?? 'application/octet-stream',
-      });
+    if (config.fallback) {
+      if (typeof config.fallback === 'string') {
+        const data = await readFile(config.fallback);
+        staticFiles.set('__fallback', {
+          data,
+          mime:
+            mime.getType(extname(config.fallback)) ??
+            'application/octet-stream',
+        });
+        return {
+          files: staticFiles,
+          fallback: undefined,
+        };
+      }
+      return {
+        files: staticFiles,
+        fallback: config.fallback,
+      };
     }
-    return staticFiles;
+    return {
+      files: staticFiles,
+      fallback: undefined,
+    };
   }
 
   private async performRequest(
-    staticFiles: Map<string, { data: Buffer; mime: string }>,
+    serveData: ServeData,
     req: {
       method: string;
       url: URL;
@@ -162,7 +200,8 @@ export class Yedra {
       if (req.method === 'GET') {
         // look for a static file
         const staticFile =
-          staticFiles.get(req.url.pathname) ?? staticFiles.get('__fallback');
+          serveData.files.get(req.url.pathname) ??
+          serveData.files.get('__fallback');
         if (staticFile !== undefined) {
           return {
             status: 200,
@@ -170,6 +209,16 @@ export class Yedra {
             headers: {
               'content-type': staticFile.mime,
             },
+          };
+        }
+        if (serveData.fallback !== undefined) {
+          const response = await serveData.fallback();
+          return {
+            status: response.status ?? 200,
+            body: isUint8Array(response.body)
+              ? response.body
+              : Buffer.from(response.body, 'utf-8'),
+            headers: response.headers,
           };
         }
       }
@@ -233,7 +282,7 @@ export class Yedra {
         path: string;
         get?: () => Promise<string> | string;
       };
-      static?: { dir: string; fallback?: string };
+      serve?: ServeConfig;
       /**
        * Prevents all normal output from Yedra. Mostly useful for tests.
        */
@@ -244,7 +293,7 @@ export class Yedra {
       connectMiddlewares?: ConnectMiddleware[];
     },
   ): Promise<Context> {
-    const staticFiles = await Yedra.loadStatic(options?.static);
+    const serveData = await Yedra.loadServe(options?.serve);
     const server =
       options?.tls === undefined
         ? createHttpServer()
@@ -264,7 +313,7 @@ export class Yedra {
           counter.increment();
           const url = new URL(req.url as string, 'http://localhost');
           const begin = Date.now();
-          const response = await this.performRequest(staticFiles, {
+          const response = await this.performRequest(serveData, {
             method: req.method ?? 'GET',
             url,
             body: req,
