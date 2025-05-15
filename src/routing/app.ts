@@ -1,5 +1,5 @@
 import { readFile, readdir, stat } from 'node:fs/promises';
-import type { IncomingMessage, OutgoingMessage, Server } from 'node:http';
+import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
 import { extname, join } from 'node:path';
@@ -44,7 +44,7 @@ class Context {
 
 type ConnectMiddleware = (
   req: IncomingMessage,
-  res: OutgoingMessage,
+  res: ServerResponse,
   next: () => void,
 ) => Promise<void>;
 
@@ -209,7 +209,7 @@ export class Yedra {
 
   private middlewareNext(
     req: IncomingMessage,
-    res: OutgoingMessage,
+    res: ServerResponse,
     middlewares: ConnectMiddleware[],
     last: () => void,
   ) {
