@@ -68,6 +68,7 @@ export abstract class RestEndpoint {
     headers?: Record<string, string>;
   }>;
   abstract documentation(
+    path: string,
     securitySchemes: Record<string, SecurityScheme>,
   ): object;
 }
@@ -177,6 +178,7 @@ class ConcreteRestEndpoint<
   }
 
   public documentation(
+    path: string,
     securitySchemes: Record<string, SecurityScheme>,
   ): object {
     const parameters = [
@@ -203,6 +205,7 @@ class ConcreteRestEndpoint<
       tags: [this.options.category],
       summary: this.options.summary,
       description: this.options.description,
+      operationId: `${path.substring(1).replaceAll('/', '_')}_${this.method.toLowerCase()}`,
       security:
         this.options.security !== undefined
           ? this.options.security.map((security) => ({ [security]: [] }))

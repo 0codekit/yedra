@@ -112,7 +112,7 @@ export class Yedra {
       const path = route.path.toString();
       const methods = paths[path] ?? {};
       methods[route.endpoint.method.toLowerCase()] =
-        route.endpoint.documentation(options.security ?? {});
+        route.endpoint.documentation(path, options.security ?? {});
       paths[path] = methods;
     }
     return {

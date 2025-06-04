@@ -75,6 +75,7 @@ test('Server Documentation', () => {
       '/stream': {
         post: {
           description: undefined,
+          operationId: 'stream_post',
           parameters: [],
           requestBody: {
             content: {
