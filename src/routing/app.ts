@@ -109,6 +109,10 @@ export class Yedra {
   }): object {
     const paths: Record<string, Record<string, object>> = {};
     for (const route of this.restRoutes) {
+      if (route.endpoint.isHidden()) {
+        // do not include hidden endpoints in the documentation
+        continue;
+      }
       const path = route.path.toString();
       const methods = paths[path] ?? {};
       methods[route.endpoint.method.toLowerCase()] =

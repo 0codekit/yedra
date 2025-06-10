@@ -38,7 +38,16 @@ type EndpointOptions<
   category: string;
   summary: string;
   description?: string;
+  /**
+   * List of security definitions that apply to this endpoint.
+   * Security definitions need to be included in the `app.docs()` call.
+   */
   security?: string[];
+  /**
+   * Whether this endpoint should be excluded from the documentation.
+   * Default is false.
+   */
+  hidden?: boolean;
   params: Params;
   query: Query;
   headers: Headers;
@@ -67,6 +76,7 @@ export abstract class RestEndpoint {
     body: unknown;
     headers?: Record<string, string>;
   }>;
+  abstract isHidden(): boolean;
   abstract documentation(
     path: string,
     securitySchemes: Record<string, SecurityScheme>,
@@ -175,6 +185,10 @@ class ConcreteRestEndpoint<
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       body: parsedBody!,
     });
+  }
+
+  public isHidden(): boolean {
+    return this.options.hidden ?? false;
   }
 
   public documentation(
