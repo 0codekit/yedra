@@ -104,7 +104,8 @@ class ConcreteRestEndpoint<
     this._method = method;
     this.options = options;
     this.paramsSchema = object(options.params);
-    this.querySchema = object(options.query);
+    // queries can sometimes include other elements for application-unrelated reasons
+    this.querySchema = laxObject(options.query);
     // headers need to be lax, since there are lots of them
     this.headersSchema = laxObject(options.headers);
   }
