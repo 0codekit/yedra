@@ -21,6 +21,7 @@ export { array } from './validation/array.js';
 export { boolean } from './validation/boolean.js';
 export { date } from './validation/date.js';
 export { _enum as enum } from './validation/enum.js';
+export { _null as null } from './validation/null.js';
 export { ValidationError } from './validation/error.js';
 export { number } from './validation/number.js';
 export { integer } from './validation/integer.js';

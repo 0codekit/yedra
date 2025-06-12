@@ -10,15 +10,6 @@ export abstract class ModifiableSchema<T> extends Schema<T> {
     return new OptionalSchema(this);
   }
 
-  /**
-   * Add a description and example to the schema.
-   * @param doc - The documentation.
-   * @deprecated - Use .describe() instead.
-   */
-  public doc(doc: { description: string; example?: T }): DocSchema<T> {
-    return new DocSchema(this, doc.description, doc.example);
-  }
-
   public describe(description: string, example?: T): DocSchema<T> {
     return new DocSchema(this, description, example);
   }
