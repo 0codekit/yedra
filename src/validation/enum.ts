@@ -5,28 +5,38 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
   T[number]
 > {
   private readonly options: T;
+  private readonly normalized: string[];
 
   public constructor(options: T) {
     super();
     this.options = options;
+    this.normalized = options.map((option) => option.toString());
   }
 
   public parse(obj: unknown): T[number] {
-    if (
-      !obj ||
-      (typeof obj !== 'string' && typeof obj !== 'number') ||
-      !this.options.includes(obj)
-    ) {
-      const actual =
-        typeof obj === 'string' || typeof obj === 'number' ? obj : typeof obj;
+    if (typeof obj !== 'string' && typeof obj !== 'number') {
+      // enum objects can only be strings or numbers
       throw new ValidationError([
         new Issue(
           [],
-          `Expected one of ${this.options.join(', ')} but got ${actual}`,
+          `Expected one of ${this.options.join(', ')} but got ${typeof obj}`,
         ),
       ]);
     }
-    return obj;
+    // compare only the stringified (normalized) values
+    const normalizedObj = obj.toString();
+    const index = this.normalized.findIndex((value) => value === normalizedObj);
+    if (index === -1) {
+      // invalid value
+      throw new ValidationError([
+        new Issue(
+          [],
+          `Expected one of ${this.options.join(', ')} but got ${obj}`,
+        ),
+      ]);
+    }
+    // return the un-normalized value
+    return this.options[index];
   }
 
   public documentation(): object {

@@ -18,3 +18,11 @@ test('Validate Enum', () => {
     'Error at ``: Expected one of 3, 4, hello but got 5.',
   );
 });
+
+test('Validate Enum Auto-Convert', () => {
+  const schema = _enum(3, '4');
+  expect(schema.parse(3)).toStrictEqual(3);
+  expect(schema.parse('3')).toStrictEqual(3);
+  expect(schema.parse(4)).toStrictEqual('4');
+  expect(schema.parse('4')).toStrictEqual('4');
+});
