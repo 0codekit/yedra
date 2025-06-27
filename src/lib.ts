@@ -17,7 +17,7 @@ export const validatePath = (path: string) => {
 export { parseEnv } from './routing/env.js';
 
 // validation
-export { array } from './validation/array.js';
+export { array } from './validation/modifiable.js';
 export { boolean } from './validation/boolean.js';
 export { date } from './validation/date.js';
 export { _enum as enum } from './validation/enum.js';
