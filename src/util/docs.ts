@@ -10,12 +10,11 @@ import type { SecurityScheme } from './security.js';
 export const paramDocs = <Params extends Record<string, Schema<unknown>>>(
   params: Params,
   position: 'path' | 'query' | 'header',
-  security: string[],
-  securitySchemes: Record<string, SecurityScheme>,
+  security: SecurityScheme[],
 ): object[] => {
   const result: object[] = [];
   for (const name in params) {
-    if (isAuthToken(name, position, security, securitySchemes)) {
+    if (isAuthToken(name, position, security)) {
       // don't include auth tokens in the documentation, they're already
       // handled by the separate authentication feature of OpenAPI
       continue;
@@ -44,20 +43,14 @@ export const paramDocs = <Params extends Record<string, Schema<unknown>>>(
 const isAuthToken = (
   paramName: string,
   position: 'path' | 'query' | 'header',
-  security: string[],
-  securitySchemes: Record<string, SecurityScheme>,
+  securitySchemes: SecurityScheme[],
 ): boolean => {
   if (position === 'path') {
-    // parameters cannot be auth tokens
+    // path parameters cannot be auth tokens
     return false;
   }
-  for (const [securityName, securityScheme] of Object.entries(
-    securitySchemes,
-  )) {
-    if (!security.includes(securityName)) {
-      continue;
-    }
-    if (securityScheme.type === 'http') {
+  for (const scheme of securitySchemes) {
+    if (scheme.scheme.type === 'http') {
       if (
         paramName.toLowerCase() === 'authorization' &&
         position === 'header'
@@ -66,8 +59,11 @@ const isAuthToken = (
         return true;
       }
     } else {
-      if (securityScheme.in === position && securityScheme.name === paramName) {
-        // api key has to have the correct name and be in the correct position
+      if (
+        scheme.scheme.in === position &&
+        paramName.toLowerCase() === scheme.scheme.name.toLowerCase()
+      ) {
+        // API key has to have the correct name and be in the correct position
         return true;
       }
     }

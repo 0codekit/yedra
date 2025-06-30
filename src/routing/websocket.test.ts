@@ -49,11 +49,12 @@ test('WebSocket', async () => {
   });
   await context.stop();
   // wait for close event
-  const { code, reason } = await new Promise<{ code: number; reason: string }>(
-    (resolve) => {
-      ws.onclose = (e) => resolve({ code: e.code, reason: e.reason });
-    },
-  );
+  const { code, reason } = await new Promise<{
+    code: number;
+    reason: string;
+  }>((resolve) => {
+    ws.onclose = (e) => resolve({ code: e.code, reason: e.reason });
+  });
   expect(code).toBe(1000);
   expect(reason).toBe('Server Shutdown');
 });

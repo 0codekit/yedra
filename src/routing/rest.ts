@@ -4,7 +4,7 @@ import type { SecurityScheme } from '../util/security.js';
 import type { BodyType, Typeof } from '../validation/body.js';
 import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
-import { type ObjectSchema, laxObject, object } from '../validation/object.js';
+import { laxObject, type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import { BadRequestError } from './errors.js';
 
@@ -39,10 +39,9 @@ type EndpointOptions<
   summary: string;
   description?: string;
   /**
-   * List of security definitions that apply to this endpoint.
-   * Security definitions need to be included in the `app.docs()` call.
+   * List of security schemes that apply to this endpoint.
    */
-  security?: string[];
+  security?: SecurityScheme[];
   /**
    * Whether this endpoint should be excluded from the documentation.
    * Default is false.
@@ -79,10 +78,15 @@ export abstract class RestEndpoint {
   abstract isHidden(): boolean;
   abstract documentation(
     path: string,
-    securitySchemes: Record<string, SecurityScheme>,
+    securitySchemes: Set<SecurityScheme>,
   ): object;
 }
 
+/**
+ * This class implements all REST endpoints in yedra. Its parent class,
+ * `RestEndpoint`, is not abstract because there are multiple implementations,
+ * but so that we can hide all the generic parameters of this class.
+ */
 class ConcreteRestEndpoint<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
@@ -194,37 +198,24 @@ class ConcreteRestEndpoint<
 
   public documentation(
     path: string,
-    securitySchemes: Record<string, SecurityScheme>,
+    securitySchemes: Set<SecurityScheme>,
   ): object {
+    const security = this.options.security ?? [];
+    for (const scheme of security) {
+      // add all our security schemes to the global list of schemes
+      securitySchemes.add(scheme);
+    }
     const parameters = [
-      ...paramDocs(
-        this.options.params,
-        'path',
-        this.options.security ?? [],
-        securitySchemes,
-      ),
-      ...paramDocs(
-        this.options.query,
-        'query',
-        this.options.security ?? [],
-        securitySchemes,
-      ),
-      ...paramDocs(
-        this.options.headers,
-        'header',
-        this.options.security ?? [],
-        securitySchemes,
-      ),
+      ...paramDocs(this.options.params, 'path', security),
+      ...paramDocs(this.options.query, 'query', security),
+      ...paramDocs(this.options.headers, 'header', security),
     ];
     return {
       tags: [this.options.category],
       summary: this.options.summary,
       description: this.options.description,
       operationId: `${path.substring(1).replaceAll('/', '_')}_${this.method.toLowerCase()}`,
-      security:
-        this.options.security !== undefined
-          ? this.options.security.map((security) => ({ [security]: [] }))
-          : [],
+      security: security.map((security) => ({ [security.name]: [] })),
       parameters,
       requestBody:
         this.options.req instanceof NoneBody

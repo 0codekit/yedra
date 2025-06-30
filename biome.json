@@ -1,28 +1,17 @@
 {
-  "$schema": "https://biomejs.dev/schemas/1.7.0/schema.json",
-  "organizeImports": {
-    "enabled": true
-  },
-  "linter": {
-    "enabled": true,
-    "rules": {
-      "recommended": true,
-      "correctness": {
-        "noUnusedImports": "error",
-        "noUnusedVariables": "error"
-      },
-      "suspicious": {
-        "useAwait": "error"
-      }
-    }
-  },
-  "javascript": {
-    "formatter": {
-      "quoteStyle": "single"
-    }
-  },
-  "formatter": {
-    "indentStyle": "space",
-    "indentWidth": 2
-  }
+	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+	"linter": {
+		"rules": {
+			"suspicious": {
+				"useAwait": "error"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"indentStyle": "space",
+			"indentWidth": 2,
+			"quoteStyle": "single"
+		}
+	}
 }

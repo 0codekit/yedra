@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createHttpsServer } from 'node:https';
@@ -51,9 +51,9 @@ type ServeResponse = {
   headers?: Record<string, string>;
 };
 
-type ServeFallback = (req: { href: string }) =>
-  | ServeResponse
-  | Promise<ServeResponse>;
+type ServeFallback = (req: {
+  href: string;
+}) => ServeResponse | Promise<ServeResponse>;
 
 type ServeConfig = {
   dir: string;
@@ -63,6 +63,25 @@ type ServeConfig = {
 type ServeData = {
   files: Map<string, ServeFile>;
   fallback: ServeFallback | undefined;
+};
+
+type DocsData = {
+  /**
+   * The title of your API.
+   */
+  title: string;
+  /**
+   * The description of your API.
+   */
+  description: string;
+  /**
+   * The current version of your API.
+   */
+  version: string;
+  /**
+   * The list of servers your API is reachable under.
+   */
+  servers?: { description: string; url: string }[];
 };
 
 type ConnectMiddleware = (
@@ -78,12 +97,16 @@ export class Yedra {
     string,
     { count: number; duration: number } | undefined
   > = {};
+  private generatedDocs: string | undefined;
 
   public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
       for (const route of endpoint.restRoutes) {
         const newPath = route.path.withPrefix(path);
-        this.restRoutes.push({ path: newPath, endpoint: route.endpoint });
+        this.restRoutes.push({
+          path: newPath,
+          endpoint: route.endpoint,
+        });
       }
       for (const route of endpoint.wsRoutes) {
         const newPath = route.path.withPrefix(path);
@@ -99,14 +122,9 @@ export class Yedra {
     return this;
   }
 
-  /**
-   * Generate OpenAPI documentation for the app.
-   */
-  public docs(options: {
-    info: { title: string; description: string; version: string };
-    security?: Record<string, SecurityScheme>;
-    servers: { description: string; url: string }[];
-  }): object {
+  private generateDocs(options: DocsData | undefined) {
+    // this set will be filled with the security schemes from all endpoints
+    const securitySchemes = new Set<SecurityScheme>();
     const paths: Record<string, Record<string, object>> = {};
     for (const route of this.restRoutes) {
       if (route.endpoint.isHidden()) {
@@ -116,18 +134,28 @@ export class Yedra {
       const path = route.path.toString();
       const methods = paths[path] ?? {};
       methods[route.endpoint.method.toLowerCase()] =
-        route.endpoint.documentation(path, options.security ?? {});
+        route.endpoint.documentation(path, securitySchemes);
       paths[path] = methods;
     }
-    return {
+    this.generatedDocs = JSON.stringify({
       openapi: '3.0.2',
-      info: options.info,
-      components: {
-        securitySchemes: options.security,
+      info: {
+        title: options?.title ?? 'Yedra API',
+        description:
+          options?.description ??
+          'This is an OpenAPI documentation generated automatically by Yedra.',
+        version: options?.version ?? '0.1.0',
       },
-      servers: options.servers,
+      components: {
+        securitySchemes: Object.fromEntries(
+          securitySchemes
+            .values()
+            .map((scheme) => [scheme.name, scheme.scheme]),
+        ),
+      },
+      servers: options?.servers ?? [],
       paths,
-    };
+    });
   }
 
   private static async loadServe(
@@ -200,6 +228,19 @@ export class Yedra {
     ) {
       return Yedra.errorResponse(405, `Method \`${req.method}\` not allowed.`);
     }
+    if (req.method === 'GET' && req.url.pathname === '/openapi.json') {
+      if (this.generatedDocs === undefined) {
+        console.error('Docs were not generated correctly.');
+        return Yedra.errorResponse(500, 'Internal Server Error');
+      }
+      return {
+        status: 200,
+        body: Buffer.from(this.generatedDocs ?? '{}', 'utf-8'),
+        headers: {
+          'content-type': 'application/json',
+        },
+      };
+    }
     const match = this.matchRestRoute(req.url.pathname, req.method);
     if (!match.result) {
       // no matching route found
@@ -219,7 +260,9 @@ export class Yedra {
         }
         if (serveData.fallback !== undefined) {
           try {
-            const response = await serveData.fallback({ href: req.url.href });
+            const response = await serveData.fallback({
+              href: req.url.href,
+            });
             return {
               status: response.status ?? 200,
               body: isUint8Array(response.body)
@@ -296,6 +339,11 @@ export class Yedra {
         path: string;
         get?: () => Promise<string> | string;
       };
+      /**
+       * Configuration for the `/openapi.json` endpoint, which generates
+       * OpenAPI documentation.
+       */
+      docs?: DocsData;
       serve?: ServeConfig;
       /**
        * Prevents all normal output from Yedra. Mostly useful for tests.
@@ -308,6 +356,7 @@ export class Yedra {
     },
   ): Promise<Context> {
     const serveData = await Yedra.loadServe(options?.serve);
+    this.generateDocs(options?.docs);
     const server =
       options?.tls === undefined
         ? createHttpServer()
@@ -436,7 +485,7 @@ export class Yedra {
           params: Record<string, string>;
           score: number;
         }
-      | undefined = undefined;
+      | undefined;
     for (const route of this.restRoutes) {
       const match = route.path.match(url);
       if (match === undefined) {
@@ -463,7 +512,7 @@ export class Yedra {
           params: Record<string, string>;
           score: number;
         }
-      | undefined = undefined;
+      | undefined;
     for (const route of this.wsRoutes) {
       const match = route.path.match(url);
       if (match === undefined) {

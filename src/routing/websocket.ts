@@ -148,8 +148,8 @@ export class Ws<
 
   public documentation(): object {
     const parameters = [
-      ...paramDocs(this.options.params, 'path', [], {}),
-      ...paramDocs(this.options.query, 'query', [], {}),
+      ...paramDocs(this.options.params, 'path', []),
+      ...paramDocs(this.options.query, 'query', []),
     ];
     return {
       tags: [this.options.category],

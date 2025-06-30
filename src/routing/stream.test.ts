@@ -50,31 +50,29 @@ test('Server Stream', async () => {
   await context.stop();
 });
 
-test('Server Documentation', () => {
-  // TODO: wouldn't it make more sense to just always provide
-  // a docs endpoint?
-  const docs = app.docs({
-    info: {
-      title: 'Title',
-      description: 'Description',
-      version: 'v1.0.0',
+test('Server Documentation', async () => {
+  const context = await app.listen(27560, {
+    docs: {
+      title: 'My API',
+      description: 'Some description.',
+      version: '0.2.0',
     },
-    servers: [],
+    quiet: true,
   });
-  expect(docs).toStrictEqual({
+  const response = await fetch('http://localhost:27560/openapi.json');
+  expect(await response.json()).toStrictEqual({
     components: {
-      securitySchemes: undefined,
+      securitySchemes: {},
     },
     info: {
-      description: 'Description',
-      title: 'Title',
-      version: 'v1.0.0',
+      title: 'My API',
+      description: 'Some description.',
+      version: '0.2.0',
     },
     openapi: '3.0.2',
     paths: {
       '/stream': {
         post: {
-          description: undefined,
           operationId: 'stream_post',
           parameters: [],
           requestBody: {
@@ -117,4 +115,5 @@ test('Server Documentation', () => {
     },
     servers: [],
   });
+  await context.stop();
 });

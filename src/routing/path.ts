@@ -22,7 +22,7 @@ export class Path {
       .split('/')
       .filter((segment) => segment !== '');
     const invalidSegment = this.expected.find(
-      (part) => part.match(/^((:?[A-Za-z0-9\-\.]+\??)|\*)$/) === null,
+      (part) => part.match(/^((:?[A-Za-z0-9\-.]+\??)|\*)$/) === null,
     );
     if (invalidSegment) {
       throw new Error(
