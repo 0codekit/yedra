@@ -122,7 +122,7 @@ export class Yedra {
     return this;
   }
 
-  private generateDocs(options: DocsData | undefined) {
+  private generateDocs(options: DocsData | undefined): void {
     // this set will be filled with the security schemes from all endpoints
     const securitySchemes = new Set<SecurityScheme>();
     const paths: Record<string, Record<string, object>> = {};
@@ -156,6 +156,13 @@ export class Yedra {
       servers: options?.servers ?? [],
       paths,
     });
+  }
+
+  public docs(): object {
+    if (this.generatedDocs === undefined) {
+      throw new Error('Documentation was not generated correctly.');
+    }
+    return JSON.parse(this.generatedDocs);
   }
 
   private static async loadServe(
