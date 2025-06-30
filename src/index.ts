@@ -12,3 +12,4 @@ export {
 } from './routing/errors.js';
 export { Delete, Get, Post, Put } from './routing/rest.js';
 export { Ws } from './routing/websocket.js';
+export { SecurityScheme } from './util/security.js';
