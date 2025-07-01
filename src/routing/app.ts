@@ -84,7 +84,7 @@ type DocsData = {
   servers?: { description: string; url: string }[];
 };
 
-type ConnectMiddleware = (
+export type ConnectMiddleware = (
   req: IncomingMessage,
   res: ServerResponse,
   next: () => void,

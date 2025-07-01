@@ -1,5 +1,6 @@
 import * as y from './lib.js';
 export { y };
+export type { ConnectMiddleware } from './routing/app.js';
 export { Yedra } from './routing/app.js';
 export {
   BadRequestError,
