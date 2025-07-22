@@ -90,14 +90,264 @@ export type ConnectMiddleware = (
   next: () => void,
 ) => void;
 
-export class Yedra {
-  private restRoutes: { path: Path; endpoint: RestEndpoint }[] = [];
-  private wsRoutes: { path: Path; endpoint: WsEndpoint }[] = [];
+type RestRoute = { path: Path; endpoint: RestEndpoint };
+type WsRoute = { path: Path; endpoint: WsEndpoint };
+
+class BuiltApp {
+  private serveData: ServeData;
+  private generatedDocs: string | undefined;
+  private connectMiddlewares: ConnectMiddleware[];
+  private quiet: boolean;
+  private restRoutes: RestRoute[] = [];
   private requestData: Record<
     string,
     { count: number; duration: number } | undefined
   > = {};
-  private generatedDocs: string | undefined;
+
+  public constructor(options: {
+    serveData: ServeData;
+    generatedDocs: string | undefined;
+    connectMiddlewares: ConnectMiddleware[];
+    quiet: boolean;
+    restRoutes: RestRoute[];
+  }) {
+    this.serveData = options.serveData;
+    this.generatedDocs = options.generatedDocs;
+    this.connectMiddlewares = options.connectMiddlewares;
+    this.quiet = options.quiet;
+    this.restRoutes = options.restRoutes;
+  }
+
+  private static middlewareNext(
+    req: IncomingMessage,
+    res: ServerResponse,
+    middlewares: ConnectMiddleware[],
+    last: () => void,
+  ): void {
+    if (middlewares.length > 0) {
+      // apply the next middleware
+      middlewares[0](req, res, () =>
+        BuiltApp.middlewareNext(req, res, middlewares.slice(1), last),
+      );
+    } else {
+      // no middlewares left, invoke yedra
+      last();
+    }
+  }
+
+  public handle(req: IncomingMessage, res: ServerResponse) {
+    // first, invoke the middleware chain
+    BuiltApp.middlewareNext(req, res, this.connectMiddlewares, async () => {
+      // this will be called after all middlewares are done
+      const url = new URL(req.url as string, 'http://localhost');
+      const begin = Date.now();
+      const response = await this.performRequest({
+        method: req.method ?? 'GET',
+        url,
+        body: req,
+        headers: req.headers,
+      });
+      const status = response.status ?? 200;
+      if (response.body instanceof ReadableStream) {
+        res.writeHead(status, response.headers);
+        for await (const chunk of response.body) {
+          res.write(chunk);
+        }
+      } else if (response.body instanceof Uint8Array) {
+        res.writeHead(status, response.headers);
+        res.write(response.body);
+      } else {
+        res.writeHead(status, {
+          'content-type': 'application/json',
+          ...response.headers,
+        });
+        res.write(JSON.stringify(response.body));
+      }
+      res.end();
+      const duration = Date.now() - begin;
+      if (this.quiet !== true) {
+        console.log(
+          `${req.method} ${url.pathname} -> ${status} (${duration}ms)`,
+        );
+      }
+      this.track(req.method as string, status, duration / 1000);
+    });
+  }
+
+  private async performRequest(req: {
+    method: string;
+    url: URL;
+    body: Readable;
+    headers: Record<string, string | string[] | undefined>;
+  }): Promise<{
+    status?: number;
+    body: unknown;
+    headers?: Record<string, string>;
+  }> {
+    if (
+      req.method !== 'GET' &&
+      req.method !== 'POST' &&
+      req.method !== 'PUT' &&
+      req.method !== 'DELETE'
+    ) {
+      return BuiltApp.errorResponse(
+        405,
+        `Method \`${req.method}\` not allowed.`,
+      );
+    }
+    if (req.method === 'GET' && req.url.pathname === '/openapi.json') {
+      if (this.generatedDocs === undefined) {
+        console.error('Docs were not generated correctly.');
+        return BuiltApp.errorResponse(500, 'Internal Server Error');
+      }
+      return {
+        status: 200,
+        body: Buffer.from(this.generatedDocs ?? '{}', 'utf-8'),
+        headers: {
+          'content-type': 'application/json',
+        },
+      };
+    }
+    const match = this.matchRestRoute(req.url.pathname, req.method);
+    if (!match.result) {
+      // no matching route found
+      if (req.method === 'GET') {
+        // look for a static file
+        const staticFile =
+          this.serveData.files.get(req.url.pathname) ??
+          this.serveData.files.get('__fallback');
+        if (staticFile !== undefined) {
+          return {
+            status: 200,
+            body: staticFile.data,
+            headers: {
+              'content-type': staticFile.mime,
+            },
+          };
+        }
+        if (this.serveData.fallback !== undefined) {
+          try {
+            const response = await this.serveData.fallback({
+              href: req.url.href,
+            });
+            return {
+              status: response.status ?? 200,
+              body: isUint8Array(response.body)
+                ? response.body
+                : Buffer.from(response.body, 'utf-8'),
+              headers: response.headers,
+            };
+          } catch (error) {
+            if (error instanceof HttpError) {
+              return BuiltApp.errorResponse(error.status, error.message);
+            }
+            console.error(error);
+            return BuiltApp.errorResponse(500, 'Internal Server Error.');
+          }
+        }
+      }
+      if (match.invalidMethod) {
+        // we found a route, but it did not match the request method
+        return BuiltApp.errorResponse(
+          405,
+          `Method ${req.method} not allowed for path \`${req.url.pathname}\`.`,
+        );
+      }
+      return BuiltApp.errorResponse(
+        404,
+        `Path \`${req.url.pathname}\` not found.`,
+      );
+    }
+    try {
+      return await match.result.endpoint.handle({
+        url: req.url.pathname,
+        body: req.body,
+        params: match.result.params,
+        query: Object.fromEntries(req.url.searchParams),
+        headers: Object.fromEntries(
+          Object.entries(req.headers).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? value.join(',') : (value ?? ''),
+          ]),
+        ),
+      });
+    } catch (error) {
+      if (error instanceof HttpError) {
+        return BuiltApp.errorResponse(error.status, error.message);
+      }
+      console.error(error);
+      return BuiltApp.errorResponse(500, 'Internal Server Error.');
+    }
+  }
+
+  private static errorResponse(
+    status: number,
+    errorMessage: string,
+  ): { status?: number; body: unknown; headers?: Record<string, string> } {
+    return {
+      status,
+      body: {
+        status,
+        errorMessage,
+      },
+    };
+  }
+
+  private matchRestRoute(
+    url: string,
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  ) {
+    let invalidMethod = false;
+    let result:
+      | {
+          endpoint: RestEndpoint;
+          params: Record<string, string>;
+          score: number;
+        }
+      | undefined;
+    for (const route of this.restRoutes) {
+      const match = route.path.match(url);
+      if (match === undefined) {
+        continue;
+      }
+      const { params, score } = match;
+      if (route.endpoint.method !== method) {
+        invalidMethod = true;
+        continue;
+      }
+      const previous = result?.score;
+      if (previous === undefined || score < previous) {
+        // if there was no previous match or this one is better, use it
+        result = { endpoint: route.endpoint, params, score };
+      }
+    }
+    return { invalidMethod, result };
+  }
+
+  private track(method: string, status: number, duration: number): void {
+    const id = `${method}-${status}`;
+    const data = this.requestData[id] ?? { count: 0, duration: 0 };
+    this.requestData[id] = {
+      count: data.count + 1,
+      duration: data.duration + duration,
+    };
+  }
+
+  public metrics(): string {
+    return Object.entries(this.requestData)
+      .map(([key, data]) => {
+        const [method, status] = key.split('-');
+        return `yedra_requests_total{method="${method}",status="${status}"} ${data?.count}
+yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.duration}
+`;
+      })
+      .join('');
+  }
+}
+
+export class Yedra {
+  private restRoutes: RestRoute[] = [];
+  private wsRoutes: WsRoute[] = [];
 
   public use(path: string, endpoint: RestEndpoint | WsEndpoint | Yedra): Yedra {
     if (endpoint instanceof Yedra) {
@@ -122,7 +372,7 @@ export class Yedra {
     return this;
   }
 
-  private generateDocs(options: DocsData | undefined): void {
+  private generateDocs(options: DocsData | undefined): string {
     // this set will be filled with the security schemes from all endpoints
     const securitySchemes = new Set<SecurityScheme>();
     const paths: Record<string, Record<string, object>> = {};
@@ -137,7 +387,7 @@ export class Yedra {
         route.endpoint.documentation(path, securitySchemes);
       paths[path] = methods;
     }
-    this.generatedDocs = JSON.stringify({
+    return JSON.stringify({
       openapi: '3.0.2',
       info: {
         title: options?.title ?? 'Yedra API',
@@ -156,13 +406,6 @@ export class Yedra {
       servers: options?.servers ?? [],
       paths,
     });
-  }
-
-  public docs(): object {
-    if (this.generatedDocs === undefined) {
-      throw new Error('Documentation was not generated correctly.');
-    }
-    return JSON.parse(this.generatedDocs);
   }
 
   private static async loadServe(
@@ -214,127 +457,28 @@ export class Yedra {
     };
   }
 
-  private async performRequest(
-    serveData: ServeData,
-    req: {
-      method: string;
-      url: URL;
-      body: Readable;
-      headers: Record<string, string | string[] | undefined>;
-    },
-  ): Promise<{
-    status?: number;
-    body: unknown;
-    headers?: Record<string, string>;
-  }> {
-    if (
-      req.method !== 'GET' &&
-      req.method !== 'POST' &&
-      req.method !== 'PUT' &&
-      req.method !== 'DELETE'
-    ) {
-      return Yedra.errorResponse(405, `Method \`${req.method}\` not allowed.`);
-    }
-    if (req.method === 'GET' && req.url.pathname === '/openapi.json') {
-      if (this.generatedDocs === undefined) {
-        console.error('Docs were not generated correctly.');
-        return Yedra.errorResponse(500, 'Internal Server Error');
-      }
-      return {
-        status: 200,
-        body: Buffer.from(this.generatedDocs ?? '{}', 'utf-8'),
-        headers: {
-          'content-type': 'application/json',
-        },
-      };
-    }
-    const match = this.matchRestRoute(req.url.pathname, req.method);
-    if (!match.result) {
-      // no matching route found
-      if (req.method === 'GET') {
-        // look for a static file
-        const staticFile =
-          serveData.files.get(req.url.pathname) ??
-          serveData.files.get('__fallback');
-        if (staticFile !== undefined) {
-          return {
-            status: 200,
-            body: staticFile.data,
-            headers: {
-              'content-type': staticFile.mime,
-            },
-          };
-        }
-        if (serveData.fallback !== undefined) {
-          try {
-            const response = await serveData.fallback({
-              href: req.url.href,
-            });
-            return {
-              status: response.status ?? 200,
-              body: isUint8Array(response.body)
-                ? response.body
-                : Buffer.from(response.body, 'utf-8'),
-              headers: response.headers,
-            };
-          } catch (error) {
-            if (error instanceof HttpError) {
-              return Yedra.errorResponse(error.status, error.message);
-            }
-            console.error(error);
-            return Yedra.errorResponse(500, 'Internal Server Error.');
-          }
-        }
-      }
-      if (match.invalidMethod) {
-        // we found a route, but it did not match the request method
-        return Yedra.errorResponse(
-          405,
-          `Method ${req.method} not allowed for path \`${req.url.pathname}\`.`,
-        );
-      }
-      return Yedra.errorResponse(
-        404,
-        `Path \`${req.url.pathname}\` not found.`,
-      );
-    }
-    try {
-      return await match.result.endpoint.handle({
-        url: req.url.pathname,
-        body: req.body,
-        params: match.result.params,
-        query: Object.fromEntries(req.url.searchParams),
-        headers: Object.fromEntries(
-          Object.entries(req.headers).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value.join(',') : (value ?? ''),
-          ]),
-        ),
-      });
-    } catch (error) {
-      if (error instanceof HttpError) {
-        return Yedra.errorResponse(error.status, error.message);
-      }
-      console.error(error);
-      return Yedra.errorResponse(500, 'Internal Server Error.');
-    }
-  }
-
-  private middlewareNext(
-    req: IncomingMessage,
-    res: ServerResponse,
-    middlewares: ConnectMiddleware[],
-    last: () => void,
-  ) {
-    if (middlewares.length > 0) {
-      // apply the next middleware
-      middlewares[0](req, res, () =>
-        this.middlewareNext(req, res, middlewares.slice(1), last),
-      );
-    } else {
-      // no middlewares left, invoke yedra
-      last();
-    }
+  public async build(options?: {
+    /**
+     * Configuration for the `/openapi.json` endpoint, which generates
+     * OpenAPI documentation.
+     */
+    docs?: DocsData;
+    quiet?: boolean;
+    serve?: ServeConfig;
+    /**
+     * Add Express/Connect compatible middleware.
+     */
+    connectMiddlewares?: ConnectMiddleware[];
+  }) {
+    const serveData = await Yedra.loadServe(options?.serve);
+    const generatedDocs = this.generateDocs(options?.docs);
+    return new BuiltApp({
+      serveData,
+      generatedDocs,
+      connectMiddlewares: options?.connectMiddlewares ?? [],
+      quiet: options?.quiet ?? false,
+      restRoutes: this.restRoutes,
+    });
   }
 
   public async listen(
@@ -362,8 +506,12 @@ export class Yedra {
       connectMiddlewares?: ConnectMiddleware[];
     },
   ): Promise<Context> {
-    const serveData = await Yedra.loadServe(options?.serve);
-    this.generateDocs(options?.docs);
+    const app = await this.build({
+      docs: options?.docs,
+      serve: options?.serve,
+      quiet: options?.quiet,
+      connectMiddlewares: options?.connectMiddlewares,
+    });
     const server =
       options?.tls === undefined
         ? createHttpServer()
@@ -373,49 +521,11 @@ export class Yedra {
           });
     const counter = new Counter();
     server.on('request', (req, res) => {
-      // first, invoke the middleware chain
-      this.middlewareNext(
-        req,
-        res,
-        options?.connectMiddlewares ?? [],
-        async () => {
-          // this will be called after all middlewares are done
-          counter.increment();
-          const url = new URL(req.url as string, 'http://localhost');
-          const begin = Date.now();
-          const response = await this.performRequest(serveData, {
-            method: req.method ?? 'GET',
-            url,
-            body: req,
-            headers: req.headers,
-          });
-          const status = response.status ?? 200;
-          if (response.body instanceof ReadableStream) {
-            res.writeHead(status, response.headers);
-            for await (const chunk of response.body) {
-              res.write(chunk);
-            }
-          } else if (response.body instanceof Uint8Array) {
-            res.writeHead(status, response.headers);
-            res.write(response.body);
-          } else {
-            res.writeHead(status, {
-              'content-type': 'application/json',
-              ...response.headers,
-            });
-            res.write(JSON.stringify(response.body));
-          }
-          res.end();
-          const duration = Date.now() - begin;
-          if (options?.quiet !== true) {
-            console.log(
-              `${req.method} ${url.pathname} -> ${status} (${duration}ms)`,
-            );
-          }
-          this.track(req.method as string, status, duration / 1000);
-          counter.decrement();
-        },
-      );
+      counter.increment();
+      app.handle(req, res);
+      res.on('close', () => {
+        counter.decrement();
+      });
     });
     const wss = new WebSocketServer({ server });
     wss.on('connection', async (ws, req) => {
@@ -447,7 +557,7 @@ export class Yedra {
       metricsServer.on('request', async (req, res) => {
         if (req.method === 'GET' && req.url === metricsEndpoint.path) {
           res.writeHead(200);
-          res.write(this.generateMetrics());
+          res.write(app.metrics());
           if (metricsEndpoint.get !== undefined) {
             res.write(await metricsEndpoint.get());
           }
@@ -466,50 +576,6 @@ export class Yedra {
       });
     }
     return new Context(server, wss, counter);
-  }
-
-  private static errorResponse(
-    status: number,
-    errorMessage: string,
-  ): { status?: number; body: unknown; headers?: Record<string, string> } {
-    return {
-      status,
-      body: {
-        status,
-        errorMessage,
-      },
-    };
-  }
-
-  private matchRestRoute(
-    url: string,
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-  ) {
-    let invalidMethod = false;
-    let result:
-      | {
-          endpoint: RestEndpoint;
-          params: Record<string, string>;
-          score: number;
-        }
-      | undefined;
-    for (const route of this.restRoutes) {
-      const match = route.path.match(url);
-      if (match === undefined) {
-        continue;
-      }
-      const { params, score } = match;
-      if (route.endpoint.method !== method) {
-        invalidMethod = true;
-        continue;
-      }
-      const previous = result?.score;
-      if (previous === undefined || score < previous) {
-        // if there was no previous match or this one is better, use it
-        result = { endpoint: route.endpoint, params, score };
-      }
-    }
-    return { invalidMethod, result };
   }
 
   private matchWsRoute(url: string) {
@@ -533,25 +599,5 @@ export class Yedra {
       }
     }
     return { result };
-  }
-
-  private track(method: string, status: number, duration: number): void {
-    const id = `${method}-${status}`;
-    const data = this.requestData[id] ?? { count: 0, duration: 0 };
-    this.requestData[id] = {
-      count: data.count + 1,
-      duration: data.duration + duration,
-    };
-  }
-
-  private generateMetrics(): string {
-    return Object.entries(this.requestData)
-      .map(([key, data]) => {
-        const [method, status] = key.split('-');
-        return `yedra_requests_total{method="${method}",status="${status}"} ${data?.count}
-yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.duration}
-`;
-      })
-      .join('');
   }
 }
