@@ -1,6 +1,6 @@
 {
 	"name": "yedra",
-	"version": "0.17.1",
+	"version": "0.17.2",
 	"repository": "github:0codekit/yedra",
 	"main": "dist/index.js",
 	"devDependencies": {

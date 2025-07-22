@@ -521,7 +521,12 @@ export class Yedra {
       };
     }
     const staticFiles = new Map<string, ServeFile>();
-    const files = await readdir(config.dir, { recursive: true });
+    let files: string[];
+    try {
+      files = await readdir(config.dir, { recursive: true });
+    } catch (_error) {
+      files = [];
+    }
     await Promise.all(
       files.map(async (file) => {
         const absolute = join(config.dir, file);
