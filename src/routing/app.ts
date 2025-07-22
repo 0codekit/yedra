@@ -99,6 +99,7 @@ class BuiltApp {
   private connectMiddlewares: ConnectMiddleware[];
   private quiet: boolean;
   private restRoutes: RestRoute[] = [];
+  private wsRoutes: WsRoute[] = [];
   private requestData: Record<
     string,
     { count: number; duration: number } | undefined
@@ -110,12 +111,14 @@ class BuiltApp {
     connectMiddlewares: ConnectMiddleware[];
     quiet: boolean;
     restRoutes: RestRoute[];
+    wsRoutes: WsRoute[];
   }) {
     this.serveData = options.serveData;
     this.generatedDocs = options.generatedDocs;
     this.connectMiddlewares = options.connectMiddlewares;
     this.quiet = options.quiet;
     this.restRoutes = options.restRoutes;
+    this.wsRoutes = options.wsRoutes;
   }
 
   private static middlewareNext(
@@ -343,6 +346,106 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
       })
       .join('');
   }
+
+  public listen(
+    port: number,
+    options?: {
+      tls?: { key: string; cert: string };
+      metrics?: {
+        port: number;
+        path: string;
+        get?: () => Promise<string> | string;
+      };
+    },
+  ): Context {
+    const server =
+      options?.tls === undefined
+        ? createHttpServer()
+        : createHttpsServer({
+            key: options.tls.key,
+            cert: options.tls.cert,
+          });
+    const counter = new Counter();
+    server.on('request', (req, res) => {
+      counter.increment();
+      this.handle(req, res);
+      res.on('close', () => {
+        counter.decrement();
+      });
+    });
+    const wss = new WebSocketServer({ server });
+    wss.on('connection', async (ws, req) => {
+      const url = new URL(req.url as string, 'http://localhost');
+      const { result } = this.matchWsRoute(url.pathname);
+      if (!result) {
+        ws.close(4404);
+        return;
+      }
+      try {
+        await result.endpoint.handle(url, result.params, ws);
+      } catch (error) {
+        if (error instanceof HttpError) {
+          ws.close(4000 + error.status, error.message);
+        } else {
+          console.error(error);
+          ws.close(1011, 'Internal Error');
+        }
+      }
+    });
+    server.listen(port, () => {
+      if (this.quiet !== true) {
+        console.log(`yedra listening on http://localhost:${port}`);
+      }
+    });
+    if (options?.metrics !== undefined) {
+      const metricsEndpoint = options.metrics;
+      const metricsServer = createHttpServer();
+      metricsServer.on('request', async (req, res) => {
+        if (req.method === 'GET' && req.url === metricsEndpoint.path) {
+          res.writeHead(200);
+          res.write(this.metrics());
+          if (metricsEndpoint.get !== undefined) {
+            res.write(await metricsEndpoint.get());
+          }
+          res.end();
+        } else {
+          res.writeHead(404);
+          res.end('Not found');
+        }
+      });
+      metricsServer.listen(metricsEndpoint.port, () => {
+        if (this.quiet !== true) {
+          console.log(
+            `yedra metrics on http://localhost:${metricsEndpoint.port}${metricsEndpoint.path}`,
+          );
+        }
+      });
+    }
+    return new Context(server, wss, counter);
+  }
+
+  private matchWsRoute(url: string) {
+    let result:
+      | {
+          endpoint: WsEndpoint;
+          params: Record<string, string>;
+          score: number;
+        }
+      | undefined;
+    for (const route of this.wsRoutes) {
+      const match = route.path.match(url);
+      if (match === undefined) {
+        continue;
+      }
+      const { params, score } = match;
+      const previous = result?.score;
+      if (previous === undefined || score < previous) {
+        // if there was no previous match or this one is better, use it
+        result = { endpoint: route.endpoint, params, score };
+      }
+    }
+    return { result };
+  }
 }
 
 export class Yedra {
@@ -478,6 +581,7 @@ export class Yedra {
       connectMiddlewares: options?.connectMiddlewares ?? [],
       quiet: options?.quiet ?? false,
       restRoutes: this.restRoutes,
+      wsRoutes: this.wsRoutes,
     });
   }
 
@@ -512,92 +616,6 @@ export class Yedra {
       quiet: options?.quiet,
       connectMiddlewares: options?.connectMiddlewares,
     });
-    const server =
-      options?.tls === undefined
-        ? createHttpServer()
-        : createHttpsServer({
-            key: options.tls.key,
-            cert: options.tls.cert,
-          });
-    const counter = new Counter();
-    server.on('request', (req, res) => {
-      counter.increment();
-      app.handle(req, res);
-      res.on('close', () => {
-        counter.decrement();
-      });
-    });
-    const wss = new WebSocketServer({ server });
-    wss.on('connection', async (ws, req) => {
-      const url = new URL(req.url as string, 'http://localhost');
-      const { result } = this.matchWsRoute(url.pathname);
-      if (!result) {
-        ws.close(4404);
-        return;
-      }
-      try {
-        await result.endpoint.handle(url, result.params, ws);
-      } catch (error) {
-        if (error instanceof HttpError) {
-          ws.close(4000 + error.status, error.message);
-        } else {
-          console.error(error);
-          ws.close(1011, 'Internal Error');
-        }
-      }
-    });
-    server.listen(port, () => {
-      if (options?.quiet !== true) {
-        console.log(`yedra listening on http://localhost:${port}`);
-      }
-    });
-    if (options?.metrics !== undefined) {
-      const metricsEndpoint = options.metrics;
-      const metricsServer = createHttpServer();
-      metricsServer.on('request', async (req, res) => {
-        if (req.method === 'GET' && req.url === metricsEndpoint.path) {
-          res.writeHead(200);
-          res.write(app.metrics());
-          if (metricsEndpoint.get !== undefined) {
-            res.write(await metricsEndpoint.get());
-          }
-          res.end();
-        } else {
-          res.writeHead(404);
-          res.end('Not found');
-        }
-      });
-      metricsServer.listen(metricsEndpoint.port, () => {
-        if (options.quiet !== true) {
-          console.log(
-            `yedra metrics on http://localhost:${metricsEndpoint.port}${metricsEndpoint.path}`,
-          );
-        }
-      });
-    }
-    return new Context(server, wss, counter);
-  }
-
-  private matchWsRoute(url: string) {
-    let result:
-      | {
-          endpoint: WsEndpoint;
-          params: Record<string, string>;
-          score: number;
-        }
-      | undefined;
-    for (const route of this.wsRoutes) {
-      const match = route.path.match(url);
-      if (match === undefined) {
-        continue;
-      }
-      const { params, score } = match;
-      const previous = result?.score;
-      if (previous === undefined || score < previous) {
-        // if there was no previous match or this one is better, use it
-        result = { endpoint: route.endpoint, params, score };
-      }
-    }
-    return { result };
+    return app.listen(port, options);
   }
 }
