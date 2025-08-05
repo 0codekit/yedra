@@ -1,15 +1,15 @@
 {
 	"name": "yedra",
-	"version": "0.17.3",
+	"version": "0.17.4",
 	"repository": "github:0codekit/yedra",
 	"main": "dist/index.js",
 	"devDependencies": {
-		"@biomejs/biome": "^2.1.2",
+		"@biomejs/biome": "^2.1.3",
 		"@types/bun": "^1.2.19",
-		"@types/node": "^24.1.0",
+		"@types/node": "^24.2.0",
 		"@types/uuid": "^10.0.0",
 		"@types/ws": "^8.18.1",
-		"typescript": "^5.8.3"
+		"typescript": "^5.9.2"
 	},
 	"bugs": "https://github.com/0codekit/yedra/issues",
 	"contributors": [

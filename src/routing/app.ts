@@ -225,7 +225,6 @@ class BuiltApp {
             body: staticFile.data,
             headers: {
               'content-type': staticFile.mime,
-              'cache-control': 'public, max-age=31536000',
             },
           };
         }
