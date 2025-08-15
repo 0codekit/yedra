@@ -49,7 +49,7 @@ class OptionalSchema<T> extends Schema<T | undefined> {
   }
 
   public override parse(obj: unknown): T | undefined {
-    if (obj === undefined || obj === null) {
+    if (obj === undefined) {
       return undefined;
     }
     return this.schema.parse(obj);
