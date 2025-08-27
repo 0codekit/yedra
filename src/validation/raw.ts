@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
 
-class RawBody extends BodyType<Buffer> {
+class RawBody extends BodyType<Buffer<ArrayBuffer>> {
   private contentType: string;
 
   public constructor(contentType: string) {
@@ -13,7 +13,7 @@ class RawBody extends BodyType<Buffer> {
   public async deserialize(
     stream: Readable,
     _contentType: string,
-  ): Promise<Buffer> {
+  ): Promise<Buffer<ArrayBuffer>> {
     return await readableToBuffer(stream);
   }
 
