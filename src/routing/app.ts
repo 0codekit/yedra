@@ -19,11 +19,13 @@ class Context {
   private readonly server: Server;
   private readonly wss: WebSocketServer;
   private readonly counter: Counter;
+  public readonly docs: object;
 
-  public constructor(server: Server, wss: WebSocketServer, counter: Counter) {
+  public constructor(server: Server, wss: WebSocketServer, counter: Counter, docs: object) {
     this.server = server;
     this.wss = wss;
     this.counter = counter;
+    this.docs = docs;
   }
 
   public stop(): Promise<void> {
@@ -95,6 +97,7 @@ type WsRoute = { path: Path; endpoint: WsEndpoint };
 
 class BuiltApp {
   private serveData: ServeData;
+  private docs: object;
   private generatedDocs: string | undefined;
   private connectMiddlewares: ConnectMiddleware[];
   private quiet: boolean;
@@ -107,14 +110,15 @@ class BuiltApp {
 
   public constructor(options: {
     serveData: ServeData;
-    generatedDocs: string | undefined;
+    docs: object;
     connectMiddlewares: ConnectMiddleware[];
     quiet: boolean;
     restRoutes: RestRoute[];
     wsRoutes: WsRoute[];
   }) {
     this.serveData = options.serveData;
-    this.generatedDocs = options.generatedDocs;
+    this.docs = options.docs;
+    this.generatedDocs = JSON.stringify(options.docs);
     this.connectMiddlewares = options.connectMiddlewares;
     this.quiet = options.quiet;
     this.restRoutes = options.restRoutes;
@@ -421,7 +425,7 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
         }
       });
     }
-    return new Context(server, wss, counter);
+    return new Context(server, wss, counter, this.docs);
   }
 
   private matchWsRoute(url: string) {
@@ -475,7 +479,7 @@ export class Yedra {
     return this;
   }
 
-  private generateDocs(options: DocsData | undefined): string {
+  private generateDocs(options: DocsData | undefined): object {
     // this set will be filled with the security schemes from all endpoints
     const securitySchemes = new Set<SecurityScheme>();
     const paths: Record<string, Record<string, object>> = {};
@@ -490,7 +494,7 @@ export class Yedra {
         route.endpoint.documentation(path, securitySchemes);
       paths[path] = methods;
     }
-    return JSON.stringify({
+    return {
       openapi: '3.0.2',
       info: {
         title: options?.title ?? 'Yedra API',
@@ -508,7 +512,7 @@ export class Yedra {
       },
       servers: options?.servers ?? [],
       paths,
-    });
+    };
   }
 
   private static async loadServe(
@@ -579,10 +583,10 @@ export class Yedra {
     connectMiddlewares?: ConnectMiddleware[];
   }) {
     const serveData = await Yedra.loadServe(options?.serve);
-    const generatedDocs = this.generateDocs(options?.docs);
+    const docs = this.generateDocs(options?.docs);
     return new BuiltApp({
       serveData,
-      generatedDocs,
+      docs,
       connectMiddlewares: options?.connectMiddlewares ?? [],
       quiet: options?.quiet ?? false,
       restRoutes: this.restRoutes,
