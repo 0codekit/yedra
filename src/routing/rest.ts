@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream';
 import { paramDocs } from '../util/docs.js';
 import type { SecurityScheme } from '../util/security.js';
-import type { BodyType, Typeof } from '../validation/body.js';
+import type { BodyType, Typeof, TypeofAccepts } from '../validation/body.js';
 import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
 import { laxObject, type ObjectSchema, object } from '../validation/object.js';
@@ -32,8 +32,8 @@ type EndpointOptions<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
-  Req extends BodyType<unknown>,
-  Res extends BodyType<unknown>,
+  Req extends BodyType<unknown, unknown>,
+  Res extends BodyType<unknown, unknown>,
 > = {
   category: string;
   summary: string;
@@ -59,7 +59,7 @@ type EndpointOptions<
       Typeof<ObjectSchema<Headers>>,
       Typeof<Req>
     >,
-  ) => ResObject<Typeof<Res>>;
+  ) => ResObject<TypeofAccepts<Res>>;
 };
 
 export abstract class RestEndpoint {
@@ -91,8 +91,8 @@ class ConcreteRestEndpoint<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
-  Req extends BodyType<unknown>,
-  Res extends BodyType<unknown>,
+  Req extends BodyType<unknown, unknown>,
+  Res extends BodyType<unknown, unknown>,
 > extends RestEndpoint {
   private _method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   private options: EndpointOptions<Params, Query, Headers, Req, Res>;
@@ -256,7 +256,7 @@ export class Get<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
-  Res extends BodyType<unknown>,
+  Res extends BodyType<unknown, unknown>,
 > extends ConcreteRestEndpoint<Params, Query, Headers, NoneBody, Res> {
   public constructor(
     options: Omit<
@@ -272,8 +272,8 @@ export class Post<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
-  Req extends BodyType<unknown>,
-  Res extends BodyType<unknown>,
+  Req extends BodyType<unknown, unknown>,
+  Res extends BodyType<unknown, unknown>,
 > extends ConcreteRestEndpoint<Params, Query, Headers, Req, Res> {
   public constructor(
     options: EndpointOptions<Params, Query, Headers, Req, Res>,
@@ -286,8 +286,8 @@ export class Put<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
-  Req extends BodyType<unknown>,
-  Res extends BodyType<unknown>,
+  Req extends BodyType<unknown, unknown>,
+  Res extends BodyType<unknown, unknown>,
 > extends ConcreteRestEndpoint<Params, Query, Headers, Req, Res> {
   public constructor(
     options: EndpointOptions<Params, Query, Headers, Req, Res>,
@@ -300,7 +300,7 @@ export class Delete<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
-  Res extends BodyType<unknown>,
+  Res extends BodyType<unknown, unknown>,
 > extends ConcreteRestEndpoint<Params, Query, Headers, NoneBody, Res> {
   public constructor(
     options: Omit<

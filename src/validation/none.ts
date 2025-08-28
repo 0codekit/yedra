@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream';
 import { BodyType } from './body.js';
 
-export class NoneBody extends BodyType<undefined> {
+export class NoneBody extends BodyType<undefined, undefined> {
   public deserialize(
     _stream: Readable,
     _contentType: string,

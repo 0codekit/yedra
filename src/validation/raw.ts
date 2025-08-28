@@ -2,7 +2,7 @@ import type { Readable } from 'node:stream';
 import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
 
-class RawBody extends BodyType<Buffer<ArrayBuffer>> {
+class RawBody extends BodyType<Buffer<ArrayBuffer>, Buffer<ArrayBufferLike>> {
   private contentType: string;
 
   public constructor(contentType: string) {

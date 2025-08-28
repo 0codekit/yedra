@@ -1,9 +1,15 @@
 import type { Readable } from 'node:stream';
-import { BodyType, type Typeof } from './body.js';
+import {
+  BodyType,
+  type Typeof,
+  type TypeofAccepts,
+  type TypeofProvides,
+} from './body.js';
 import { ValidationError } from './error.js';
 
-class EitherBody<T extends [...BodyType<unknown>[]]> extends BodyType<
-  Typeof<T[number]>
+class EitherBody<T extends [...BodyType<unknown, unknown>[]]> extends BodyType<
+  TypeofProvides<T[number]>,
+  TypeofAccepts<T[number]>
 > {
   private options: T;
 
@@ -45,5 +51,6 @@ class EitherBody<T extends [...BodyType<unknown>[]]> extends BodyType<
  * @param options
  * @returns
  */
-export const either = <T extends [...BodyType<unknown>[]]>(...options: T) =>
-  new EitherBody(options);
+export const either = <T extends [...BodyType<unknown, unknown>[]]>(
+  ...options: T
+) => new EitherBody(options);

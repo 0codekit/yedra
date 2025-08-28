@@ -25,7 +25,7 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
     }
     // compare only the stringified (normalized) values
     const normalizedObj = obj.toString();
-    const index = this.normalized.findIndex((value) => value === normalizedObj);
+    const index = this.normalized.indexOf(normalizedObj);
     if (index === -1) {
       // invalid value
       throw new ValidationError([

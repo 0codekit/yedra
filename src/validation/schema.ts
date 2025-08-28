@@ -6,7 +6,7 @@ import { Issue, ValidationError } from './error.js';
 /**
  * The base class for all schemas.
  */
-export abstract class Schema<T> extends BodyType<T> {
+export abstract class Schema<T> extends BodyType<T, T> {
   public async deserialize(stream: Readable, contentType: string): Promise<T> {
     const buffer = await readableToBuffer(stream);
     if (buffer.length === 0) {

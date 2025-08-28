@@ -1,7 +1,7 @@
 import type { Readable } from 'node:stream';
 import { BodyType } from './body.js';
 
-class StreamBody extends BodyType<ReadableStream> {
+class StreamBody extends BodyType<ReadableStream, ReadableStream> {
   private readonly contentType: string;
 
   public constructor(contentType: string) {

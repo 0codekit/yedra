@@ -1,9 +1,10 @@
+import type { Typeof } from './body.js';
 import { ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 import type { Schema } from './schema.js';
 
 class UnionSchema<T extends [...Schema<unknown>[]]> extends ModifiableSchema<
-  T[number]['_typeof']
+  Typeof<T[number]>
 > {
   private readonly options: T;
 
@@ -12,7 +13,7 @@ class UnionSchema<T extends [...Schema<unknown>[]]> extends ModifiableSchema<
     this.options = options;
   }
 
-  public parse(obj: unknown): T[number]['_typeof'] {
+  public parse(obj: unknown): Typeof<T[number]> {
     const issues = [];
     for (const option of this.options) {
       try {

@@ -26,10 +26,10 @@ export class Path {
     );
     if (invalidSegment) {
       throw new Error(
-        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^((:?[A-Za-z0-9-\.]+\\??)|\\*)$/.`,
+        `API path ${path} is invalid: Segment ${invalidSegment} does not match regex /^((:?[A-Za-z0-9-.]+\\??)|\\*)$/.`,
       );
     }
-    const wildcard = this.expected.findIndex((part) => part === '*');
+    const wildcard = this.expected.indexOf('*');
     if (wildcard !== -1 && wildcard !== this.expected.length - 1) {
       throw new Error(
         `API path ${path} is invalid: * must be the last path segment.`,
