@@ -21,7 +21,12 @@ class Context {
   private readonly counter: Counter;
   public readonly docs: object;
 
-  public constructor(server: Server, wss: WebSocketServer, counter: Counter, docs: object) {
+  public constructor(
+    server: Server,
+    wss: WebSocketServer,
+    counter: Counter,
+    docs: object,
+  ) {
     this.server = server;
     this.wss = wss;
     this.counter = counter;

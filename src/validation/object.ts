@@ -97,6 +97,7 @@ export class ObjectSchema<
       type: 'object',
       properties,
       required: required.length > 0 ? required : undefined,
+      additionalProperties: this.lax,
     };
   }
 }
