@@ -20,12 +20,12 @@ type ResObject<Body> =
   | Promise<{
       status?: number;
       body: Body;
-      headers?: Record<string, string>;
+      headers?: Record<string, string | undefined>;
     }>
   | {
       status?: number;
       body: Body;
-      headers?: Record<string, string>;
+      headers?: Record<string, string | undefined>;
     };
 
 type EndpointOptions<
@@ -73,7 +73,7 @@ export abstract class RestEndpoint {
   }): Promise<{
     status?: number;
     body: unknown;
-    headers?: Record<string, string>;
+    headers?: Record<string, string | undefined>;
   }>;
   abstract isHidden(): boolean;
   abstract documentation(
@@ -127,7 +127,7 @@ class ConcreteRestEndpoint<
   }): Promise<{
     status?: number;
     body: unknown;
-    headers?: Record<string, string>;
+    headers?: Record<string, string | undefined>;
   }> {
     let parsedBody: Typeof<Req>;
     let parsedParams: Typeof<ObjectSchema<Params>>;

@@ -156,10 +156,10 @@ test('Server Method Not Allowed', async () => {
     status: 405,
     errorMessage: 'Method POST not allowed for path `/test`.',
   });
-  await context.stop();
   const response3 = await fetch('http://localhost:27535/test', {
     method: 'HEAD',
   });
   console.log(await response3.text());
   expect(response3.status).toBe(405);
+  await context.stop();
 });

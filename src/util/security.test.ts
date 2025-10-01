@@ -72,7 +72,11 @@ test('Security Scheme Docs', async () => {
               description: 'Success',
               content: {
                 'application/json': {
-                  schema: { type: 'object', properties: {} },
+                  schema: {
+                    additionalProperties: false,
+                    type: 'object',
+                    properties: {},
+                  },
                 },
               },
             },

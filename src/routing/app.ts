@@ -194,7 +194,7 @@ class BuiltApp {
   }): Promise<{
     status?: number;
     body: unknown;
-    headers?: Record<string, string>;
+    headers?: Record<string, string | undefined>;
   }> {
     if (
       req.method !== 'GET' &&
