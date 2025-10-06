@@ -100,6 +100,7 @@ test('Server Documentation', async () => {
                         type: 'number',
                       },
                     },
+                    required: ['status', 'errorMessage'],
                     type: 'object',
                   },
                 },

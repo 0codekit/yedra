@@ -90,6 +90,7 @@ test('Security Scheme Docs', async () => {
                       status: { type: 'number' },
                       errorMessage: { type: 'string' },
                     },
+                    required: ['status', 'errorMessage'],
                   },
                 },
               },
