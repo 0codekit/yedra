@@ -242,6 +242,7 @@ class ConcreteRestEndpoint<
                   errorMessage: {
                     type: 'string',
                   },
+                  required: ['status', 'errorMessage'],
                 },
               },
             },
