@@ -16,6 +16,7 @@ test('Server Static Without Fallback', async () => {
   expect(await response2.json()).toStrictEqual({
     status: 404,
     errorMessage: 'Path `/abcd` not found.',
+    code: 'not_found',
   });
   await context.stop();
 });

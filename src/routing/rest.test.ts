@@ -155,6 +155,7 @@ test('Server Method Not Allowed', async () => {
   expect(await response2.json()).toStrictEqual({
     status: 405,
     errorMessage: 'Method POST not allowed for path `/test`.',
+    code: 'method_not_allowed',
   });
   const response3 = await fetch('http://localhost:27535/test', {
     method: 'HEAD',

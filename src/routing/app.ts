@@ -251,7 +251,11 @@ class BuiltApp {
             };
           } catch (error) {
             if (error instanceof HttpError) {
-              return BuiltApp.errorResponse(error.status, error.message);
+              return BuiltApp.errorResponse(
+                error.status,
+                error.message,
+                error.code,
+              );
             }
             console.error(error);
             return BuiltApp.errorResponse(500, 'Internal Server Error.');
@@ -285,7 +289,7 @@ class BuiltApp {
       });
     } catch (error) {
       if (error instanceof HttpError) {
-        return BuiltApp.errorResponse(error.status, error.message);
+        return BuiltApp.errorResponse(error.status, error.message, error.code);
       }
       console.error(error);
       return BuiltApp.errorResponse(500, 'Internal Server Error.');
@@ -295,12 +299,24 @@ class BuiltApp {
   private static errorResponse(
     status: number,
     errorMessage: string,
+    code?: string,
   ): { status?: number; body: unknown; headers?: Record<string, string> } {
+    const defaultCodes = new Map<number, string>([
+      [400, 'bad_request'],
+      [401, 'unauthorized'],
+      [402, 'payment_required'],
+      [403, 'forbidden'],
+      [404, 'not_found'],
+      [405, 'method_not_allowed'],
+      [409, 'conflict'],
+      [500, 'internal_server_error'],
+    ]);
     return {
       status,
       body: {
         status,
         errorMessage,
+        code: code ?? defaultCodes.get(status) ?? 'unknown_error',
       },
     };
   }

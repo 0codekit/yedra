@@ -3,9 +3,11 @@
  */
 export class HttpError extends Error {
   public readonly status: number;
-  public constructor(status: number, message: string) {
+  public readonly code: string | undefined;
+  public constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -14,8 +16,8 @@ export class HttpError extends Error {
  * Corresponds to HTTP status code 400 Bad Request.
  */
 export class BadRequestError extends HttpError {
-  public constructor(message: string) {
-    super(400, message);
+  public constructor(message: string, code?: string) {
+    super(400, message, code);
   }
 }
 
@@ -24,8 +26,8 @@ export class BadRequestError extends HttpError {
  * Corresponds to HTTP status code 401 Unauthorized.
  */
 export class UnauthorizedError extends HttpError {
-  public constructor(message: string) {
-    super(401, message);
+  public constructor(message: string, code?: string) {
+    super(401, message, code);
   }
 }
 
@@ -34,8 +36,8 @@ export class UnauthorizedError extends HttpError {
  * Corresponds to HTTP status code 402 Payment Required.
  */
 export class PaymentRequiredError extends HttpError {
-  public constructor(message: string) {
-    super(402, message);
+  public constructor(message: string, code?: string) {
+    super(402, message, code);
   }
 }
 
@@ -44,8 +46,8 @@ export class PaymentRequiredError extends HttpError {
  * Corresponds to HTTP status code 403 Forbidden.
  */
 export class ForbiddenError extends HttpError {
-  public constructor(message: string) {
-    super(403, message);
+  public constructor(message: string, code?: string) {
+    super(403, message, code);
   }
 }
 
@@ -54,8 +56,8 @@ export class ForbiddenError extends HttpError {
  * Corresponds to HTTP status code 404 Not Found.
  */
 export class NotFoundError extends HttpError {
-  public constructor(message: string) {
-    super(404, message);
+  public constructor(message: string, code?: string) {
+    super(404, message, code);
   }
 }
 
@@ -64,7 +66,7 @@ export class NotFoundError extends HttpError {
  * Corresponds to HTTP status code 409 Conflict.
  */
 export class ConflictError extends HttpError {
-  public constructor(message: string) {
-    super(409, message);
+  public constructor(message: string, code?: string) {
+    super(409, message, code);
   }
 }
