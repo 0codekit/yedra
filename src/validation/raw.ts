@@ -13,8 +13,12 @@ class RawBody extends BodyType<Buffer<ArrayBuffer>, Buffer<ArrayBufferLike>> {
   public async deserialize(
     stream: Readable,
     _contentType: string,
-  ): Promise<Buffer<ArrayBuffer>> {
-    return await readableToBuffer(stream);
+  ): Promise<{ parsed: Buffer<ArrayBuffer>; raw: Buffer<ArrayBuffer> }> {
+    const buffer = await readableToBuffer(stream);
+    return {
+      parsed: buffer,
+      raw: buffer,
+    };
   }
 
   public bodyDocs(): object {

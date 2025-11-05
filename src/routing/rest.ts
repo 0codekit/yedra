@@ -14,6 +14,11 @@ type ReqObject<Params, Query, Headers, Body> = {
   query: Query;
   headers: Headers;
   body: Body;
+  /**
+   * The raw request data. If the request body is
+   * streamed, this will be an empty buffer.
+   */
+  raw: Buffer<ArrayBuffer>;
 };
 
 type ResObject<Body> =
@@ -130,15 +135,18 @@ class ConcreteRestEndpoint<
     headers?: Record<string, string | undefined>;
   }> {
     let parsedBody: Typeof<Req>;
+    let rawBody: Buffer<ArrayBuffer>;
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
     const issues: Issue[] = [];
     try {
-      parsedBody = await this.options.req.deserialize(
+      const result = await this.options.req.deserialize(
         req.body,
         req.headers['content-type'] ?? 'application/octet-stream',
       );
+      parsedBody = result.parsed;
+      rawBody = result.raw;
     } catch (error) {
       if (error instanceof SyntaxError) {
         issues.push(new Issue(['body'], error.message));
@@ -189,6 +197,8 @@ class ConcreteRestEndpoint<
       headers: parsedHeaders!,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       body: parsedBody!,
+      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
+      raw: rawBody!,
     });
   }
 
