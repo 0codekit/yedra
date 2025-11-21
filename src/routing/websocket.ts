@@ -58,7 +58,7 @@ class YedraWebSocket {
    * Send binary data over the WebSocket connection;
    * @param message - The message that will be sent.
    */
-  public send(message: Buffer | string) {
+  public send(message: Uint8Array<ArrayBufferLike> | string) {
     this.ws.send(message);
   }
 
@@ -77,6 +77,8 @@ class YedraWebSocket {
     this.ws.close(code, reason);
   }
 }
+
+export type { YedraWebSocket };
 
 type WebSocketOptions<
   Params extends Record<string, Schema<unknown>>,
