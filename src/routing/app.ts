@@ -6,6 +6,7 @@ import { extname, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { URL } from 'node:url';
 import { isUint8Array } from 'node:util/types';
+import { context, propagation, trace } from '@opentelemetry/api';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
 import { Counter } from '../util/counter.js';
@@ -393,10 +394,22 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
     const counter = new Counter();
     server.on('request', (req, res) => {
       counter.increment();
-      this.handle(req, res);
-      res.on('close', () => {
-        counter.decrement();
-      });
+      const extractedContext = propagation.extract(
+        context.active(),
+        req.headers,
+      );
+      context.with(extractedContext, () =>
+        trace.getTracer('yedra').startActiveSpan('incoming_request', (span) => {
+          this.handle(req, res);
+          res.on('close', () => {
+            span.setAttribute('http.method', req.method ?? 'UNKNOWN');
+            span.setAttribute('http.url', req.url ?? 'UNKNOWN');
+            span.setAttribute('http.status', res.statusCode);
+            span.end();
+            counter.decrement();
+          });
+        }),
+      );
     });
     const wss = new WebSocketServer({ server });
     wss.on('connection', async (ws, req) => {
@@ -653,3 +666,10 @@ export class Yedra {
     return app.listen(port, options);
   }
 }
+
+/**
+ * TODO: how do we add OpenTelemetry instrumentation here?
+ * We need two things:
+ * 1. Start active span for each incoming request, and end after response is sent.
+ * 2. Extract context from incoming requests to propagate traces.
+ */
