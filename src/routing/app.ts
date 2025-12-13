@@ -6,7 +6,7 @@ import { extname, join } from 'node:path';
 import type { Readable } from 'node:stream';
 import { URL } from 'node:url';
 import { isUint8Array } from 'node:util/types';
-import { context, propagation, trace } from '@opentelemetry/api';
+import { context, propagation, SpanKind, trace } from '@opentelemetry/api';
 import mime from 'mime';
 import { WebSocketServer } from 'ws';
 import { Counter } from '../util/counter.js';
@@ -399,16 +399,22 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
         req.headers,
       );
       context.with(extractedContext, () =>
-        trace.getTracer('yedra').startActiveSpan('incoming_request', (span) => {
-          this.handle(req, res);
-          res.on('close', () => {
-            span.setAttribute('http.method', req.method ?? 'UNKNOWN');
-            span.setAttribute('http.url', req.url ?? 'UNKNOWN');
-            span.setAttribute('http.status', res.statusCode);
-            span.end();
-            counter.decrement();
-          });
-        }),
+        trace.getTracer('yedra').startActiveSpan(
+          'incoming_request',
+          {
+            kind: SpanKind.SERVER,
+          },
+          (span) => {
+            this.handle(req, res);
+            res.on('close', () => {
+              span.setAttribute('http.method', req.method ?? 'UNKNOWN');
+              span.setAttribute('http.url', req.url ?? 'UNKNOWN');
+              span.setAttribute('http.status_code', res.statusCode);
+              span.end();
+              counter.decrement();
+            });
+          },
+        ),
       );
     });
     const wss = new WebSocketServer({ server });
