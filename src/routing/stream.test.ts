@@ -93,6 +93,7 @@ test('Server Documentation', async () => {
                 'application/json': {
                   schema: {
                     properties: {
+                      code: { type: 'string' },
                       errorMessage: {
                         type: 'string',
                       },

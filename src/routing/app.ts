@@ -426,7 +426,13 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
         return;
       }
       try {
-        await result.endpoint.handle(url, result.params, ws);
+        const headers = Object.fromEntries(
+          Object.entries(req.headers).map(([key, value]) => [
+            key,
+            Array.isArray(value) ? value.join(',') : (value ?? ''),
+          ]),
+        );
+        await result.endpoint.handle(url, result.params, headers, ws);
       } catch (error) {
         if (error instanceof HttpError) {
           ws.close(4000 + error.status, error.message);

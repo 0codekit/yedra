@@ -3,7 +3,7 @@ import type { WebSocket as NodeWebSocket } from 'ws';
 import { paramDocs } from '../util/docs.js';
 import type { Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
-import { type ObjectSchema, object } from '../validation/object.js';
+import { laxObject, type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import { BadRequestError } from './errors.js';
 
@@ -83,18 +83,21 @@ export type { YedraWebSocket };
 type WebSocketOptions<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
 > = {
   category: string;
   summary: string;
   description?: string;
   params: Params;
   query: Query;
+  headers: Headers;
   do: (
     ws: YedraWebSocket,
     req: {
       url: string;
       params: Typeof<ObjectSchema<Params>>;
       query: Typeof<ObjectSchema<Query>>;
+      headers: Typeof<ObjectSchema<Headers>>;
     },
   ) => Promise<void> | void;
 };
@@ -103,6 +106,7 @@ export abstract class WsEndpoint {
   abstract handle(
     url: URL,
     params: Record<string, string>,
+    headers: Record<string, string>,
     ws: NodeWebSocket,
   ): Promise<void>;
 }
@@ -110,30 +114,36 @@ export abstract class WsEndpoint {
 export class Ws<
   Params extends Record<string, Schema<unknown>>,
   Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
 > extends WsEndpoint {
-  private options: WebSocketOptions<Params, Query>;
+  private options: WebSocketOptions<Params, Query, Headers>;
   private paramsSchema: ObjectSchema<Params>;
   private querySchema: ObjectSchema<Query>;
+  private headersSchema: ObjectSchema<Headers>;
 
-  public constructor(options: WebSocketOptions<Params, Query>) {
+  public constructor(options: WebSocketOptions<Params, Query, Headers>) {
     super();
     this.options = options;
     this.paramsSchema = object(options.params);
     this.querySchema = object(options.query);
+    this.headersSchema = laxObject(options.headers);
   }
 
   public async handle(
     url: URL,
     params: Record<string, string>,
+    headers: Record<string, string>,
     ws: NodeWebSocket,
   ): Promise<void> {
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
+    let parsedHeaders: Typeof<ObjectSchema<Headers>>;
     try {
       parsedParams = this.paramsSchema.parse(params);
       parsedQuery = this.querySchema.parse(
         Object.fromEntries(url.searchParams),
       );
+      parsedHeaders = this.headersSchema.parse(headers);
     } catch (error) {
       if (error instanceof ValidationError) {
         throw new BadRequestError(error.format());
@@ -144,6 +154,7 @@ export class Ws<
       url: url.pathname,
       params: parsedParams,
       query: parsedQuery,
+      headers: parsedHeaders,
     });
     return undefined;
   }
@@ -152,6 +163,7 @@ export class Ws<
     const parameters = [
       ...paramDocs(this.options.params, 'path', []),
       ...paramDocs(this.options.query, 'query', []),
+      ...paramDocs(this.options.headers, 'header', []),
     ];
     return {
       tags: [this.options.category],

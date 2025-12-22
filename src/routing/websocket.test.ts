@@ -16,6 +16,9 @@ test('WebSocket', async () => {
         query: {
           hello: string(),
         },
+        headers: {
+          cookie: string().optional(),
+        },
         do(ws, req) {
           ws.onmessage = (data) => {
             ws.send(
@@ -23,6 +26,7 @@ test('WebSocket', async () => {
                 url: '/ws',
                 id: req.params.id,
                 hello: req.query.hello,
+                cookie: req.headers.cookie,
                 message: data.toString('utf-8'),
               }),
             );
@@ -31,7 +35,11 @@ test('WebSocket', async () => {
       }),
     )
     .listen(27539, { quiet: true });
-  const ws = new WebSocket('http://localhost:27539/ws/test?hello=world');
+  const ws = new WebSocket('http://localhost:27539/ws/test?hello=world', {
+    headers: {
+      Cookie: 'session=abc123',
+    },
+  });
   // wait for WebSocket to open
   await new Promise((resolve) => {
     ws.onopen = resolve;
@@ -45,6 +53,7 @@ test('WebSocket', async () => {
     url: '/ws',
     id: 'test',
     hello: 'world',
+    cookie: 'session=abc123',
     message: 'this is a message',
   });
   await context.stop();

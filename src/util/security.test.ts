@@ -87,6 +87,7 @@ test('Security Scheme Docs', async () => {
                   schema: {
                     type: 'object',
                     properties: {
+                      code: { type: 'string' },
                       status: { type: 'number' },
                       errorMessage: { type: 'string' },
                     },
