@@ -23,6 +23,7 @@ export { either } from './validation/either.js';
 export { _enum as enum } from './validation/enum.js';
 export { ValidationError } from './validation/error.js';
 export { integer } from './validation/integer.js';
+export { json } from './validation/json.js';
 // validation
 export { array } from './validation/modifiable.js';
 export { _null as null } from './validation/null.js';

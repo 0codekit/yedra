@@ -25,7 +25,7 @@ export abstract class BodyType<Provides, Accepts> {
   public abstract deserialize(
     stream: Readable,
     contentType: string,
-  ): Promise<{ parsed: Provides; raw: Buffer<ArrayBuffer> }>;
+  ): Promise<Provides>;
 
   /**
    * Generate OpenAPI docs for this body.

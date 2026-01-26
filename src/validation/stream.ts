@@ -12,9 +12,9 @@ class StreamBody extends BodyType<ReadableStream, ReadableStream> {
   public deserialize(
     stream: Readable,
     _contentType: string,
-  ): Promise<{ parsed: ReadableStream; raw: Buffer<ArrayBuffer> }> {
-    return Promise.resolve({
-      parsed: new ReadableStream({
+  ): Promise<ReadableStream> {
+    return Promise.resolve(
+      new ReadableStream({
         async start(controller) {
           for await (const chunk of stream) {
             controller.enqueue(chunk);
@@ -22,8 +22,7 @@ class StreamBody extends BodyType<ReadableStream, ReadableStream> {
           controller.close();
         },
       }),
-      raw: Buffer.from(''),
-    });
+    );
   }
 
   public bodyDocs(): object {

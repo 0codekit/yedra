@@ -5,8 +5,8 @@ export class NoneBody extends BodyType<undefined, undefined> {
   public deserialize(
     _stream: Readable,
     _contentType: string,
-  ): Promise<{ parsed: undefined; raw: Buffer<ArrayBuffer> }> {
-    return Promise.resolve({ parsed: undefined, raw: Buffer.from('') });
+  ): Promise<undefined> {
+    return Promise.resolve(undefined);
   }
 
   public bodyDocs(): object {

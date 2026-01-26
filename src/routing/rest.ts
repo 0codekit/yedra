@@ -14,11 +14,6 @@ type ReqObject<Params, Query, Headers, Body> = {
   query: Query;
   headers: Headers;
   body: Body;
-  /**
-   * The raw request data. If the request body is
-   * streamed, this will be an empty buffer.
-   */
-  raw: Buffer<ArrayBuffer>;
 };
 
 type ResObject<Body> =
@@ -68,7 +63,7 @@ type EndpointOptions<
 };
 
 export abstract class RestEndpoint {
-  abstract get method(): 'GET' | 'POST' | 'PUT' | 'DELETE';
+  abstract get method(): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   abstract handle(req: {
     url: string;
     body: Readable;
@@ -99,14 +94,14 @@ class ConcreteRestEndpoint<
   Req extends BodyType<unknown, unknown>,
   Res extends BodyType<unknown, unknown>,
 > extends RestEndpoint {
-  private _method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  private _method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   private options: EndpointOptions<Params, Query, Headers, Req, Res>;
   private paramsSchema: ObjectSchema<Params>;
   private querySchema: ObjectSchema<Query>;
   private headersSchema: ObjectSchema<Headers>;
 
   public constructor(
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
     options: EndpointOptions<Params, Query, Headers, Req, Res>,
   ) {
     super();
@@ -119,7 +114,7 @@ class ConcreteRestEndpoint<
     this.headersSchema = laxObject(options.headers);
   }
 
-  public get method(): 'GET' | 'POST' | 'PUT' | 'DELETE' {
+  public get method(): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' {
     return this._method;
   }
 
@@ -135,7 +130,6 @@ class ConcreteRestEndpoint<
     headers?: Record<string, string | undefined>;
   }> {
     let parsedBody: Typeof<Req>;
-    let rawBody: Buffer<ArrayBuffer>;
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
@@ -145,8 +139,7 @@ class ConcreteRestEndpoint<
         req.body,
         req.headers['content-type'] ?? 'application/octet-stream',
       );
-      parsedBody = result.parsed;
-      rawBody = result.raw;
+      parsedBody = result;
     } catch (error) {
       if (error instanceof SyntaxError) {
         issues.push(new Issue(['body'], error.message));
@@ -197,8 +190,6 @@ class ConcreteRestEndpoint<
       headers: parsedHeaders!,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       body: parsedBody!,
-      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
-      raw: rawBody!,
     });
   }
 
@@ -307,6 +298,20 @@ export class Put<
     options: EndpointOptions<Params, Query, Headers, Req, Res>,
   ) {
     super('PUT', options);
+  }
+}
+
+export class Patch<
+  Params extends Record<string, Schema<unknown>>,
+  Query extends Record<string, Schema<unknown>>,
+  Headers extends Record<string, Schema<unknown>>,
+  Req extends BodyType<unknown, unknown>,
+  Res extends BodyType<unknown, unknown>,
+> extends ConcreteRestEndpoint<Params, Query, Headers, Req, Res> {
+  public constructor(
+    options: EndpointOptions<Params, Query, Headers, Req, Res>,
+  ) {
+    super('PATCH', options);
   }
 }
 

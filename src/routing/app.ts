@@ -201,6 +201,7 @@ class BuiltApp {
       req.method !== 'GET' &&
       req.method !== 'POST' &&
       req.method !== 'PUT' &&
+      req.method !== 'PATCH' &&
       req.method !== 'DELETE'
     ) {
       return BuiltApp.errorResponse(
@@ -324,7 +325,7 @@ class BuiltApp {
 
   private matchRestRoute(
     url: string,
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   ) {
     let invalidMethod = false;
     let result:

@@ -21,7 +21,7 @@ class EitherBody<T extends [...BodyType<unknown, unknown>[]]> extends BodyType<
   public deserialize(
     stream: Readable,
     contentType: string,
-  ): Promise<{ parsed: Typeof<T[number]>; raw: Buffer<ArrayBuffer> }> {
+  ): Promise<Typeof<T[number]>> {
     const issues = [];
     for (const option of this.options) {
       try {

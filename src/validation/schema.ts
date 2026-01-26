@@ -7,13 +7,10 @@ import { Issue, ValidationError } from './error.js';
  * The base class for all schemas.
  */
 export abstract class Schema<T> extends BodyType<T, T> {
-  public async deserialize(
-    stream: Readable,
-    contentType: string,
-  ): Promise<{ parsed: T; raw: Buffer<ArrayBuffer> }> {
+  public async deserialize(stream: Readable, contentType: string): Promise<T> {
     const buffer = await readableToBuffer(stream);
     if (buffer.length === 0) {
-      return { parsed: this.parse({}), raw: buffer };
+      return this.parse({});
     }
     if (contentType !== 'application/json') {
       throw new ValidationError([
@@ -24,7 +21,7 @@ export abstract class Schema<T> extends BodyType<T, T> {
       ]);
     }
     const data = JSON.parse(Buffer.from(buffer).toString('utf8'));
-    return { parsed: this.parse(data), raw: buffer };
+    return this.parse(data);
   }
 
   public bodyDocs(): object {
