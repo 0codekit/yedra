@@ -163,8 +163,16 @@ class BuiltApp {
       const status = response.status ?? 200;
       if (response.body instanceof ReadableStream) {
         res.writeHead(status, response.headers);
-        for await (const chunk of response.body) {
-          res.write(chunk);
+        try {
+          for await (const chunk of response.body) {
+            const canContinue = res.write(chunk);
+            if (!canContinue) {
+              // Buffer full - wait for drain before continuing
+              await new Promise<void>((resolve) => res.once('drain', resolve));
+            }
+          }
+        } catch (_error) {
+          res.destroy();
         }
       } else if (response.body instanceof Uint8Array) {
         res.writeHead(status, response.headers);
