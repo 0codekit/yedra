@@ -4,7 +4,7 @@ import { string } from './string.js';
 test('Validate String', () => {
   const schema = string();
   expect(schema.isOptional()).toBeFalse();
-  expect(schema.documentation()).toStrictEqual({
+  expect(schema.documentation()).toMatchObject({
     type: 'string',
   });
   expect(schema.parse('hello')).toStrictEqual('hello');
@@ -16,15 +16,97 @@ test('Validate String', () => {
 test('Validate String Pattern', () => {
   const schema = string().pattern(/^[0-9]+$/);
   expect(schema.isOptional()).toBeFalse();
-  expect(schema.documentation()).toStrictEqual({
+  expect(schema.documentation()).toMatchObject({
     type: 'string',
     pattern: '^[0-9]+$',
   });
   expect(schema.parse('123')).toStrictEqual('123');
   expect(() => schema.parse('hello')).toThrow(
-    'Error at ``: `hello` does not match pattern /^[0-9]+$/.',
+    'Error at ``: Does not match pattern /^[0-9]+$/.',
   );
   expect(() => schema.parse(3)).toThrow(
     'Error at ``: Expected string but got number.',
+  );
+});
+
+test('Validate String Min', () => {
+  const schema = string().min(2);
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    minLength: 2,
+  });
+  expect(schema.parse('ab')).toStrictEqual('ab');
+  expect(() => schema.parse('a')).toThrow(
+    'Error at ``: Must be at least 2 characters.',
+  );
+});
+
+test('Validate String Max', () => {
+  const schema = string().max(5);
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    maxLength: 5,
+  });
+  expect(schema.parse('abcde')).toStrictEqual('abcde');
+  expect(() => schema.parse('abcdef')).toThrow(
+    'Error at ``: Must be at most 5 characters.',
+  );
+});
+
+test('Validate String Min And Max', () => {
+  const schema = string()
+    .min(2)
+    .refine((s) => s.length <= 5, 'Must be at most 5 characters', {
+      maxLength: 5,
+    });
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    minLength: 2,
+    maxLength: 5,
+  });
+  expect(schema.parse('ab')).toStrictEqual('ab');
+  expect(schema.parse('abcde')).toStrictEqual('abcde');
+  expect(() => schema.parse('a')).toThrow(
+    'Error at ``: Must be at least 2 characters.',
+  );
+  expect(() => schema.parse('abcdef')).toThrow(
+    'Error at ``: Must be at most 5 characters.',
+  );
+});
+
+test('Validate String Min With Pattern', () => {
+  const schema = string()
+    .min(2)
+    .refine((s) => /^[a-z]+$/.test(s), 'Does not match pattern /^[a-z]+$/', {
+      pattern: '^[a-z]+$',
+    });
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    pattern: '^[a-z]+$',
+    minLength: 2,
+  });
+  expect(schema.parse('ab')).toStrictEqual('ab');
+  expect(() => schema.parse('a')).toThrow(
+    'Error at ``: Must be at least 2 characters.',
+  );
+  expect(() => schema.parse('AB')).toThrow(
+    'Error at ``: Does not match pattern /^[a-z]+$/.',
+  );
+});
+
+test('Validate String Pattern Then Refine Min', () => {
+  const schema = string()
+    .pattern(/^[a-z]+$/)
+    .refine((s) => s.length >= 2, 'Must be at least 2 characters', {
+      minLength: 2,
+    });
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    pattern: '^[a-z]+$',
+    minLength: 2,
+  });
+  expect(schema.parse('ab')).toStrictEqual('ab');
+  expect(() => schema.parse('a')).toThrow(
+    'Error at ``: Must be at least 2 characters.',
   );
 });

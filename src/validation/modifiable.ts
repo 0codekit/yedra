@@ -131,7 +131,7 @@ class DefaultSchema<T> extends Schema<T> {
   }
 }
 
-class RefinedSchema<T> extends ModifiableSchema<T> {
+export class RefinedSchema<T> extends ModifiableSchema<T> {
   private readonly schema: Schema<T>;
   private readonly predicate: (value: T) => boolean;
   private readonly message: string;
