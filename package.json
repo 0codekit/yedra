@@ -35,6 +35,7 @@
 	"type": "module",
 	"dependencies": {
 		"@opentelemetry/api": "^1.9.0",
+		"@standard-schema/spec": "^1.1.0",
 		"mime": "^4.1.0",
 		"uuid": "^13.0.0",
 		"ws": "^8.19.0"
