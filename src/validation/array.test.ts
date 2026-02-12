@@ -36,9 +36,9 @@ test('Validate Array Length', () => {
     'world',
   ]);
   expect(() => schema.parse(['hello', 'world'])).toThrow(
-    'Error at ``: Must have at least 3 items, but has 2.',
+    'Error at ``: Must have at least 3 items.',
   );
   expect(() => schema.parse(['hello', 'there', 'other', 'world'])).toThrow(
-    'Error at ``: Must have at most 3 items, but has 4.',
+    'Error at ``: Must have at most 3 items.',
   );
 });
