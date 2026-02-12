@@ -8,7 +8,7 @@ import { Issue, ValidationError } from './error.js';
  */
 export abstract class Schema<T>
   extends BodyType<T, T>
-  implements StandardSchemaV1<unknown, T>
+  implements StandardSchemaV1<T, T>
 {
   public async deserialize(stream: Readable, contentType: string): Promise<T> {
     // Lazy import to keep this module browser-safe for yedra/schema.
@@ -68,7 +68,7 @@ export abstract class Schema<T>
    *
    * @see https://standardschema.dev/
    */
-  public get '~standard'(): StandardSchemaV1.Props<unknown, T> {
+  public get '~standard'(): StandardSchemaV1.Props<T, T> {
     return {
       version: 1,
       vendor: 'yedra',
