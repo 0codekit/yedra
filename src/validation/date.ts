@@ -1,10 +1,9 @@
-import { isDate } from 'node:util/types';
 import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 
 class DateSchema extends ModifiableSchema<Date> {
   public override parse(obj: unknown): Date {
-    if (isDate(obj)) {
+    if (obj instanceof Date) {
       return obj;
     }
     if (typeof obj === 'string' || typeof obj === 'number') {

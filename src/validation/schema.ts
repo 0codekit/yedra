@@ -1,6 +1,5 @@
 import type { Readable } from 'node:stream';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
 import { Issue, ValidationError } from './error.js';
 
@@ -12,6 +11,10 @@ export abstract class Schema<T>
   implements StandardSchemaV1<unknown, T>
 {
   public async deserialize(stream: Readable, contentType: string): Promise<T> {
+    // Lazy import to keep this module browser-safe for yedra/schema.
+    // deserialize() is only called server-side, so the Node-specific
+    // stream utility is never resolved when bundled for the frontend.
+    const { readableToBuffer } = await import('../util/stream.js');
     const buffer = await readableToBuffer(stream);
     if (buffer.length === 0) {
       return this.parse({});
