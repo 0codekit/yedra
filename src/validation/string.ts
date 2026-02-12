@@ -1,6 +1,8 @@
 import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 class StringSchema extends ModifiableSchema<string> {
   /**
    * Set the minimum length the string is allowed to be.
@@ -24,6 +26,15 @@ class StringSchema extends ModifiableSchema<string> {
       `Must be at most ${length} characters`,
       { maxLength: length },
     );
+  }
+
+  /**
+   * Require the string to be a valid email address.
+   */
+  public email() {
+    return this.refine((s) => EMAIL_REGEX.test(s), 'Expected email address', {
+      format: 'email',
+    });
   }
 
   /**

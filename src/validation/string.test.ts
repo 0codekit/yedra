@@ -41,6 +41,45 @@ test('Validate String Min', () => {
   );
 });
 
+test('Validate String Email', () => {
+  const schema = string().email();
+  expect(schema.isOptional()).toBeFalse();
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    format: 'email',
+  });
+  expect(schema.parse('user@example.com')).toStrictEqual('user@example.com');
+  expect(() => schema.parse('not-email')).toThrow(
+    'Error at ``: Expected email address.',
+  );
+  expect(() => schema.parse(3)).toThrow(
+    'Error at ``: Expected string but got number.',
+  );
+});
+
+test('Validate String Email Optional', () => {
+  const schema = string().email().optional();
+  expect(schema.isOptional()).toBeTrue();
+  expect(schema.parse('user@example.com')).toStrictEqual('user@example.com');
+  expect(schema.parse(undefined)).toBeUndefined();
+});
+
+test('Validate String Email With Max', () => {
+  const schema = string()
+    .max(254)
+    .refine(
+      (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s),
+      'Expected email address',
+      { format: 'email' },
+    );
+  expect(schema.documentation()).toMatchObject({
+    type: 'string',
+    format: 'email',
+    maxLength: 254,
+  });
+  expect(schema.parse('user@example.com')).toStrictEqual('user@example.com');
+});
+
 test('Validate String Max', () => {
   const schema = string().max(5);
   expect(schema.documentation()).toMatchObject({
