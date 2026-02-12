@@ -1,4 +1,5 @@
 import type { Readable } from 'node:stream';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
 import { Issue, ValidationError } from './error.js';
@@ -6,7 +7,10 @@ import { Issue, ValidationError } from './error.js';
 /**
  * The base class for all schemas.
  */
-export abstract class Schema<T> extends BodyType<T, T> {
+export abstract class Schema<T>
+  extends BodyType<T, T>
+  implements StandardSchemaV1<unknown, T>
+{
   public async deserialize(stream: Readable, contentType: string): Promise<T> {
     const buffer = await readableToBuffer(stream);
     if (buffer.length === 0) {
@@ -49,5 +53,43 @@ export abstract class Schema<T> extends BodyType<T, T> {
    */
   public isOptional(): boolean {
     return false;
+  }
+
+  /**
+   * Standard Schema V1 compliance. This allows yedra schemas to be used
+   * directly with libraries that accept Standard Schema validators
+   * (e.g. TanStack Form, TanStack Router, tRPC).
+   *
+   * This is a non-breaking addition — it does not affect `parse()` or any
+   * existing behavior. All subclasses inherit this automatically.
+   *
+   * @see https://standardschema.dev/
+   */
+  public get '~standard'(): StandardSchemaV1.Props<unknown, T> {
+    return {
+      version: 1,
+      vendor: 'yedra',
+      // Wraps parse() to match Standard Schema's non-throwing convention:
+      // returns { value } on success, { issues } on failure.
+      validate: (value: unknown) => {
+        try {
+          return { value: this.parse(value) };
+        } catch (error) {
+          if (error instanceof ValidationError) {
+            return {
+              issues: error.issues.map((issue) => ({
+                message: issue.message,
+                // Convert array index strings ("0", "1") to numbers
+                path: issue.path.map((segment) => {
+                  const num = Number(segment);
+                  return Number.isInteger(num) && num >= 0 ? num : segment;
+                }),
+              })),
+            };
+          }
+          throw error;
+        }
+      },
+    };
   }
 }
