@@ -1,7 +1,7 @@
-import type { Typeof } from './body.js';
-import { Issue, ValidationError } from './error.js';
-import { ModifiableSchema } from './modifiable.js';
-import { Schema } from './schema.js';
+import type { Typeof } from "./body.js";
+import { Issue, ValidationError } from "./error.js";
+import { ModifiableSchema } from "./modifiable.js";
+import { Schema } from "./schema.js";
 
 /**
  * Make a union of all keys that are not extended by undefined
@@ -35,14 +35,14 @@ export class ObjectSchema<
   public override parse(obj: unknown): MakeFieldsOptional<{
     [K in keyof Shape]: Typeof<Shape[K]>;
   }> {
-    if (typeof obj !== 'object') {
+    if (typeof obj !== "object") {
       throw new ValidationError([
         new Issue([], `Expected object but got ${typeof obj}`),
       ]);
     }
     if (obj == null) {
       throw new ValidationError([
-        new Issue([], 'Expected object but got null'),
+        new Issue([], "Expected object but got null"),
       ]);
     }
     const result = {} as {
@@ -53,7 +53,7 @@ export class ObjectSchema<
       const propSchema = this.shape[prop];
       if (propSchema instanceof Schema) {
         if (!(prop in obj || propSchema.isOptional())) {
-          issues.push(new Issue([prop], 'Required'));
+          issues.push(new Issue([prop], "Required"));
           continue;
         }
         try {
@@ -72,7 +72,7 @@ export class ObjectSchema<
         if (prop in this.shape) {
           continue;
         }
-        issues.push(new Issue([prop], 'Unrecognized'));
+        issues.push(new Issue([prop], "Unrecognized"));
       }
     }
     if (issues.length > 0) {
@@ -94,10 +94,10 @@ export class ObjectSchema<
       }
     }
     return {
-      type: 'object',
+      type: "object",
       properties,
-      required: required.length > 0 ? required : undefined,
-      additionalProperties: this.lax,
+      ...(required.length > 0 && { required }),
+      ...(this.lax && { additionalProperties: true }),
     };
   }
 }

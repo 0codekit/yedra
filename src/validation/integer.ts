@@ -1,5 +1,5 @@
-import { Issue, ValidationError } from './error.js';
-import { ModifiableSchema } from './modifiable.js';
+import { Issue, ValidationError } from "./error.js";
+import { ModifiableSchema } from "./modifiable.js";
 
 class IntegerSchema extends ModifiableSchema<number> {
   private readonly minValue?: number;
@@ -17,7 +17,7 @@ class IntegerSchema extends ModifiableSchema<number> {
    */
   public min(value: number): IntegerSchema {
     if (!Number.isInteger(value)) {
-      throw new Error('minimum value has to be an integer');
+      throw new Error("minimum value has to be an integer");
     }
     return new IntegerSchema(value, this.maxValue);
   }
@@ -28,18 +28,18 @@ class IntegerSchema extends ModifiableSchema<number> {
    */
   public max(value: number): IntegerSchema {
     if (!Number.isInteger(value)) {
-      throw new Error('maximum value has to be an integer');
+      throw new Error("maximum value has to be an integer");
     }
     return new IntegerSchema(this.minValue, value);
   }
 
   public override parse(obj: unknown): number {
-    if (typeof obj !== 'number' && typeof obj !== 'string') {
+    if (typeof obj !== "number" && typeof obj !== "string") {
       throw new ValidationError([
         new Issue([], `Expected number but got ${typeof obj}`),
       ]);
     }
-    const num = typeof obj === 'number' ? obj : Number.parseFloat(obj);
+    const num = typeof obj === "number" ? obj : Number.parseFloat(obj);
     if (Number.isNaN(num) || !Number.isInteger(num)) {
       throw new ValidationError([
         new Issue([], `Expected integer but got ${typeof obj}`),
@@ -60,9 +60,9 @@ class IntegerSchema extends ModifiableSchema<number> {
 
   public override documentation(): object {
     return {
-      type: 'integer',
-      minimum: this.minValue,
-      maximum: this.maxValue,
+      type: "integer",
+      ...(this.minValue !== undefined && { minimum: this.minValue }),
+      ...(this.maxValue !== undefined && { maximum: this.maxValue }),
     };
   }
 }
