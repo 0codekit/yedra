@@ -1,4 +1,4 @@
-import { Schema } from './schema.js';
+import { Schema } from "./schema.js";
 
 export class DocSchema<T> extends Schema<T> {
   private readonly _schema: Schema<T>;
@@ -19,7 +19,7 @@ export class DocSchema<T> extends Schema<T> {
   public override documentation(): object {
     return {
       description: this._description,
-      example: this._example,
+      ...(this._example !== undefined && { example: this._example }),
       ...this._schema.documentation(),
     };
   }
