@@ -1,7 +1,7 @@
-import type { Typeof } from './body.js';
-import { DocSchema } from './doc.js';
-import { Issue, ValidationError } from './error.js';
-import { Schema } from './schema.js';
+import type { Typeof } from "./body.js";
+import { DocSchema } from "./doc.js";
+import { Issue, ValidationError } from "./error.js";
+import { Schema } from "./schema.js";
 
 export abstract class ModifiableSchema<T> extends Schema<T> {
   /**
@@ -12,8 +12,8 @@ export abstract class ModifiableSchema<T> extends Schema<T> {
   }
 
   /**
-   * Provide a default value. If the input is undefined, null, or fails
-   * validation, the default value is returned instead.
+   * Provide a default value. If the input is undefined or null, the default
+   * value is returned instead.
    * @param value - The default value.
    */
   public default(value: T): DefaultSchema<T> {
@@ -23,15 +23,14 @@ export abstract class ModifiableSchema<T> extends Schema<T> {
   /**
    * Add a custom validation predicate. The inner schema is parsed first,
    * then the predicate is checked against the parsed value.
-   * @param fn - A predicate that returns true if the value is valid.
-   * @param message - An optional error message when the predicate fails.
+   * @param fn - A predicate that returns true if the value is valid, or a
+   *   string error message if it is not.
    */
   public refine(
-    fn: (value: T) => boolean,
-    message?: string,
+    fn: (value: T) => boolean | string,
     docs?: Record<string, unknown>,
   ): RefinedSchema<T> {
-    return new RefinedSchema(this, fn, message ?? 'Validation failed', docs);
+    return new RefinedSchema(this, fn, docs);
   }
 
   public describe(description: string, example?: T): DocSchema<T> {
@@ -109,14 +108,7 @@ class DefaultSchema<T> extends Schema<T> {
     if (obj === undefined || obj === null) {
       return this.defaultValue;
     }
-    try {
-      return this.schema.parse(obj);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        return this.defaultValue;
-      }
-      throw error;
-    }
+    return this.schema.parse(obj);
   }
 
   public override documentation(): object {
@@ -133,29 +125,28 @@ class DefaultSchema<T> extends Schema<T> {
 
 export class RefinedSchema<T> extends ModifiableSchema<T> {
   private readonly schema: Schema<T>;
-  private readonly predicate: (value: T) => boolean;
-  private readonly message: string;
+  private readonly predicate: (value: T) => boolean | string;
   private readonly docs?: Record<string, unknown>;
 
   public constructor(
     schema: Schema<T>,
-    predicate: (value: T) => boolean,
-    message: string,
+    predicate: (value: T) => boolean | string,
     docs?: Record<string, unknown>,
   ) {
     super();
     this.schema = schema;
     this.predicate = predicate;
-    this.message = message;
     this.docs = docs;
   }
 
   public override parse(obj: unknown): T {
     const parsed = this.schema.parse(obj);
-    if (!this.predicate(parsed)) {
-      throw new ValidationError([new Issue([], this.message)]);
+    const result = this.predicate(parsed);
+    if (result === true) {
+      return parsed;
     }
-    return parsed;
+    const message = typeof result === "string" ? result : "Validation failed";
+    throw new ValidationError([new Issue([], message)]);
   }
 
   public override documentation(): object {
@@ -186,8 +177,7 @@ export class ArraySchema<
    */
   public min(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
     return this.refine(
-      (arr) => arr.length >= items,
-      `Must have at least ${items} items`,
+      (arr) => arr.length >= items || `Must have at least ${items} items`,
       { minItems: items },
     );
   }
@@ -198,8 +188,7 @@ export class ArraySchema<
    */
   public max(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
     return this.refine(
-      (arr) => arr.length <= items,
-      `Must have at most ${items} items`,
+      (arr) => arr.length <= items || `Must have at most ${items} items`,
       { maxItems: items },
     );
   }
@@ -211,8 +200,7 @@ export class ArraySchema<
    */
   public length(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
     return this.min(items).refine(
-      (arr) => arr.length <= items,
-      `Must have at most ${items} items`,
+      (arr) => arr.length <= items || `Must have at most ${items} items`,
       { maxItems: items },
     );
   }
@@ -244,7 +232,7 @@ export class ArraySchema<
 
   public documentation(): object {
     return {
-      type: 'array',
+      type: "array",
       items: this.itemSchema.documentation(),
     };
   }

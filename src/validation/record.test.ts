@@ -1,14 +1,14 @@
-import { expect, test } from 'bun:test';
-import { number } from './number.js';
-import { record } from './record.js';
+import { expect, test } from "bun:test";
+import { number } from "./number.js";
+import { record } from "./record.js";
 
-test('Validate Record', () => {
+test("Validate Record", () => {
   const schema = record(number());
   expect(schema.isOptional()).toBeFalse();
-  expect(schema.documentation()).toMatchObject({
-    type: 'object',
+  expect(schema.documentation()).toStrictEqual({
+    type: "object",
     additionalProperties: {
-      type: 'number',
+      type: "number",
     },
   });
   const result: Record<string, number | undefined> = schema.parse({
@@ -16,7 +16,7 @@ test('Validate Record', () => {
     world: 4,
   });
   expect(result).toStrictEqual({ hello: 3, world: 4 });
-  expect(() => schema.parse({ hello: 'world' })).toThrow(
-    'Error at `hello`: Expected number but got string.',
+  expect(() => schema.parse({ hello: "world" })).toThrow(
+    "Error at `hello`: Expected number but got string.",
   );
 });

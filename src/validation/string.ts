@@ -1,5 +1,5 @@
-import { Issue, ValidationError } from './error.js';
-import { ModifiableSchema } from './modifiable.js';
+import { Issue, ValidationError } from "./error.js";
+import { ModifiableSchema } from "./modifiable.js";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -10,8 +10,7 @@ class StringSchema extends ModifiableSchema<string> {
    */
   public min(length: number) {
     return this.refine(
-      (s) => s.length >= length,
-      `Must be at least ${length} characters`,
+      (s) => s.length >= length || `Must be at least ${length} characters`,
       { minLength: length },
     );
   }
@@ -22,8 +21,7 @@ class StringSchema extends ModifiableSchema<string> {
    */
   public max(length: number) {
     return this.refine(
-      (s) => s.length <= length,
-      `Must be at most ${length} characters`,
+      (s) => s.length <= length || `Must be at most ${length} characters`,
       { maxLength: length },
     );
   }
@@ -32,8 +30,8 @@ class StringSchema extends ModifiableSchema<string> {
    * Require the string to be a valid email address.
    */
   public email() {
-    return this.refine((s) => EMAIL_REGEX.test(s), 'Expected email address', {
-      format: 'email',
+    return this.refine((s) => EMAIL_REGEX.test(s) || "Expected email address", {
+      format: "email",
     });
   }
 
@@ -43,14 +41,13 @@ class StringSchema extends ModifiableSchema<string> {
    */
   public pattern(pattern: RegExp) {
     return this.refine(
-      (s) => pattern.test(s),
-      `Does not match pattern /${pattern.source}/`,
+      (s) => pattern.test(s) || `Does not match pattern /${pattern.source}/`,
       { pattern: pattern.source },
     );
   }
 
   public override parse(obj: unknown): string {
-    if (typeof obj !== 'string') {
+    if (typeof obj !== "string") {
       throw new ValidationError([
         new Issue([], `Expected string but got ${typeof obj}`),
       ]);
@@ -60,7 +57,7 @@ class StringSchema extends ModifiableSchema<string> {
 
   public override documentation(): object {
     return {
-      type: 'string',
+      type: "string",
     };
   }
 }

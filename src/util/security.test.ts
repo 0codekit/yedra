@@ -1,21 +1,21 @@
-import { expect, test } from 'bun:test';
-import { Yedra } from '../routing/app.js';
-import { Get } from '../routing/rest.js';
-import { object } from '../validation/object.js';
-import { string } from '../validation/string.js';
-import { SecurityScheme } from './security.js';
+import { expect, test } from "bun:test";
+import { Yedra } from "../routing/app.js";
+import { Get } from "../routing/rest.js";
+import { object } from "../validation/object.js";
+import { string } from "../validation/string.js";
+import { SecurityScheme } from "./security.js";
 
-const apiKeyAuth = new SecurityScheme('apiKeyAuth', {
-  type: 'apiKey',
-  in: 'header',
-  name: 'auth',
+const apiKeyAuth = new SecurityScheme("apiKeyAuth", {
+  type: "apiKey",
+  in: "header",
+  name: "auth",
 });
 
 const app = new Yedra().use(
-  '/test',
+  "/test",
   new Get({
-    category: 'Test',
-    summary: 'Test security schemes.',
+    category: "Test",
+    summary: "Test security schemes.",
     security: [apiKeyAuth],
     params: {},
     query: {
@@ -33,65 +33,64 @@ const app = new Yedra().use(
   }),
 );
 
-test('Security Scheme Docs', async () => {
+test("Security Scheme Docs", async () => {
   const context = await app.listen(27561, {
     quiet: true,
   });
-  const response = await fetch('http://localhost:27561/openapi.json');
+  const response = await fetch("http://localhost:27561/openapi.json");
   expect(await response.json()).toStrictEqual({
-    openapi: '3.0.2',
+    openapi: "3.0.2",
     info: {
-      title: 'Yedra API',
+      title: "Yedra API",
       description:
-        'This is an OpenAPI documentation generated automatically by Yedra.',
-      version: '0.1.0',
+        "This is an OpenAPI documentation generated automatically by Yedra.",
+      version: "0.1.0",
     },
     components: {
       securitySchemes: {
-        apiKeyAuth: { type: 'apiKey', in: 'header', name: 'auth' },
+        apiKeyAuth: { type: "apiKey", in: "header", name: "auth" },
       },
     },
     servers: [],
     paths: {
-      '/test': {
+      "/test": {
         get: {
-          tags: ['Test'],
-          summary: 'Test security schemes.',
-          operationId: 'test_get',
+          tags: ["Test"],
+          summary: "Test security schemes.",
+          operationId: "test_get",
           security: [{ apiKeyAuth: [] }],
           parameters: [
             {
-              name: 'q',
-              in: 'query',
+              name: "q",
+              in: "query",
               required: true,
-              schema: { type: 'string' },
+              schema: { type: "string" },
             },
           ],
           responses: {
-            '200': {
-              description: 'Success',
+            "200": {
+              description: "Success",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    additionalProperties: false,
-                    type: 'object',
+                    type: "object",
                     properties: {},
                   },
                 },
               },
             },
-            '400': {
-              description: 'Bad Request',
+            "400": {
+              description: "Bad Request",
               content: {
-                'application/json': {
+                "application/json": {
                   schema: {
-                    type: 'object',
+                    type: "object",
                     properties: {
-                      code: { type: 'string' },
-                      status: { type: 'number' },
-                      errorMessage: { type: 'string' },
+                      code: { type: "string" },
+                      status: { type: "number" },
+                      errorMessage: { type: "string" },
                     },
-                    required: ['status', 'errorMessage'],
+                    required: ["status", "errorMessage"],
                   },
                 },
               },

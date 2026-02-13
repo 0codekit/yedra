@@ -1,5 +1,5 @@
-import { Issue, ValidationError } from './error.js';
-import { ModifiableSchema } from './modifiable.js';
+import { Issue, ValidationError } from "./error.js";
+import { ModifiableSchema } from "./modifiable.js";
 
 class NumberSchema extends ModifiableSchema<number> {
   private readonly minValue?: number;
@@ -28,12 +28,12 @@ class NumberSchema extends ModifiableSchema<number> {
   }
 
   public override parse(obj: unknown): number {
-    if (typeof obj !== 'number' && typeof obj !== 'string') {
+    if (typeof obj !== "number" && typeof obj !== "string") {
       throw new ValidationError([
         new Issue([], `Expected number but got ${typeof obj}`),
       ]);
     }
-    const num = typeof obj === 'number' ? obj : Number.parseFloat(obj);
+    const num = typeof obj === "number" ? obj : Number.parseFloat(obj);
     if (Number.isNaN(num)) {
       throw new ValidationError([
         new Issue([], `Expected number but got ${typeof obj}`),
@@ -54,9 +54,9 @@ class NumberSchema extends ModifiableSchema<number> {
 
   public override documentation(): object {
     return {
-      type: 'number',
-      minimum: this.minValue,
-      maximum: this.maxValue,
+      type: "number",
+      ...(this.minValue !== undefined && { minimum: this.minValue }),
+      ...(this.maxValue !== undefined && { maximum: this.maxValue }),
     };
   }
 }
