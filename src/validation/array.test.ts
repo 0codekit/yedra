@@ -20,6 +20,30 @@ test("Validate Array", () => {
   );
 });
 
+test("Validate Array Min And Max", () => {
+  const schema = string().array().min(1).max(3);
+  expect(schema.documentation()).toStrictEqual({
+    type: "array",
+    items: {
+      type: "string",
+    },
+    minItems: 1,
+    maxItems: 3,
+  });
+  expect(schema.parse(["hello"])).toStrictEqual(["hello"]);
+  expect(schema.parse(["hello", "there", "world"])).toStrictEqual([
+    "hello",
+    "there",
+    "world",
+  ]);
+  expect(() => schema.parse([])).toThrow(
+    "Error at ``: Must have at least 1 items.",
+  );
+  expect(() => schema.parse(["a", "b", "c", "d"])).toThrow(
+    "Error at ``: Must have at most 3 items.",
+  );
+});
+
 test("Validate Array Length", () => {
   const schema = string().array().length(3);
   expect(schema.documentation()).toStrictEqual({
