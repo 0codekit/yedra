@@ -23,7 +23,7 @@ export class ObjectSchema<
     [K in keyof Shape]: Typeof<Shape[K]>;
   }>
 > {
-  private shape: Shape;
+  public readonly shape: Shape;
   private lax: boolean;
 
   public constructor(shape: Shape, lax: boolean) {

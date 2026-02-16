@@ -35,6 +35,15 @@ test("Validate Object", () => {
   );
 });
 
+test('Access Object Shape', () => {
+  const schema = object({
+    num: number(),
+    str: string().optional(),
+  });
+  expect(schema.shape.num.parse(42)).toStrictEqual(42);
+  expect(schema.shape.str.parse('hello')).toStrictEqual('hello');
+});
+
 test("Validate Lax Object", () => {
   const schema = laxObject({
     num: number(),
