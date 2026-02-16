@@ -1,25 +1,25 @@
-import type { Readable } from 'node:stream';
-import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { BodyType } from './body.js';
-import { Issue, ValidationError } from './error.js';
+import type { Readable } from "node:stream";
+import type { StandardSchemaV1 } from "@standard-schema/spec";
+import { BodyType } from "./body.js";
+import { Issue, ValidationError } from "./error.js";
 
 /**
  * The base class for all schemas.
  */
 export abstract class Schema<T>
   extends BodyType<T, T>
-  implements StandardSchemaV1<unknown, T>
+  implements StandardSchemaV1<T, T>
 {
   public async deserialize(stream: Readable, contentType: string): Promise<T> {
     // Lazy import to keep this module browser-safe for yedra/schema.
     // deserialize() is only called server-side, so the Node-specific
     // stream utility is never resolved when bundled for the frontend.
-    const { readableToBuffer } = await import('../util/stream.js');
+    const { readableToBuffer } = await import("../util/stream.js");
     const buffer = await readableToBuffer(stream);
     if (buffer.length === 0) {
       return this.parse({});
     }
-    if (contentType !== 'application/json') {
+    if (contentType !== "application/json") {
       throw new ValidationError([
         new Issue(
           [],
@@ -27,13 +27,13 @@ export abstract class Schema<T>
         ),
       ]);
     }
-    const data = JSON.parse(Buffer.from(buffer).toString('utf8'));
+    const data = JSON.parse(Buffer.from(buffer).toString("utf8"));
     return this.parse(data);
   }
 
   public bodyDocs(): object {
     return {
-      'application/json': {
+      "application/json": {
         schema: this.documentation(),
       },
     };
@@ -68,10 +68,11 @@ export abstract class Schema<T>
    *
    * @see https://standardschema.dev/
    */
-  public get '~standard'(): StandardSchemaV1.Props<unknown, T> {
+  public get "~standard"(): StandardSchemaV1.Props<T, T> {
     return {
       version: 1,
-      vendor: 'yedra',
+      vendor: "yedra",
+      types: {} as StandardSchemaV1.Types<T, T>,
       // Wraps parse() to match Standard Schema's non-throwing convention:
       // returns { value } on success, { issues } on failure.
       validate: (value: unknown) => {
