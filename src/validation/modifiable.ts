@@ -139,6 +139,56 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
     this.docs = docs;
   }
 
+  /**
+   * Set the minimum length/items for strings and arrays.
+   * @param value - The minimum constraint.
+   */
+  public min(value: number): RefinedSchema<T> {
+    const docs = this.documentation() as Record<string, unknown>;
+    const isArray = docs.type === "array";
+    return this.refine(
+      ((v: T) => {
+        const len = (v as string | unknown[]).length;
+        return (
+          len >= value ||
+          (isArray
+            ? `Must have at least ${value} items`
+            : `Must be at least ${value} characters`)
+        );
+      }) as (value: T) => boolean | string,
+      isArray ? { minItems: value } : { minLength: value },
+    );
+  }
+
+  /**
+   * Set the maximum length/items for strings and arrays.
+   * @param value - The maximum constraint.
+   */
+  public max(value: number): RefinedSchema<T> {
+    const docs = this.documentation() as Record<string, unknown>;
+    const isArray = docs.type === "array";
+    return this.refine(
+      ((v: T) => {
+        const len = (v as string | unknown[]).length;
+        return (
+          len <= value ||
+          (isArray
+            ? `Must have at most ${value} items`
+            : `Must be at most ${value} characters`)
+        );
+      }) as (value: T) => boolean | string,
+      isArray ? { maxItems: value } : { maxLength: value },
+    );
+  }
+
+  /**
+   * Set the exact length/items for strings and arrays.
+   * @param value - The exact constraint.
+   */
+  public length(value: number): RefinedSchema<T> {
+    return this.min(value).max(value);
+  }
+
   public override parse(obj: unknown): T {
     const parsed = this.schema.parse(obj);
     const result = this.predicate(parsed);

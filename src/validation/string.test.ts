@@ -92,11 +92,7 @@ test("Validate String Max", () => {
 });
 
 test("Validate String Min And Max", () => {
-  const schema = string()
-    .min(2)
-    .refine((s) => s.length <= 5 || "Must be at most 5 characters", {
-      maxLength: 5,
-    });
+  const schema = string().min(2).max(5);
   expect(schema.documentation()).toStrictEqual({
     type: "string",
     minLength: 2,
