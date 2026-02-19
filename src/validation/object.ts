@@ -96,8 +96,8 @@ export class ObjectSchema<
     return {
       type: "object",
       properties,
+      additionalProperties: this.lax,
       ...(required.length > 0 && { required }),
-      ...(this.lax && { additionalProperties: true }),
     };
   }
 }

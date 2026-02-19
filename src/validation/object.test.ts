@@ -20,6 +20,7 @@ test("Validate Object", () => {
       },
     },
     required: ["num"],
+    additionalProperties: false,
   });
   const result: {
     num: number;
