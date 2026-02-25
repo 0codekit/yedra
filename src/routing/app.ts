@@ -461,11 +461,10 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
       const metricsServer = createHttpServer();
       metricsServer.on('request', async (req, res) => {
         if (req.method === 'GET' && req.url === metricsEndpoint.path) {
-          res.writeHead(200);
-          res.setHeader(
-            'content-type',
-            'text/plain; version=0.0.4; charset=utf-8; escaping=underscores',
-          );
+          res.writeHead(200, {
+            'content-type':
+              'text/plain; version=0.0.4; charset=utf-8; escaping=underscores',
+          });
           res.write(this.metrics());
           if (metricsEndpoint.get !== undefined) {
             res.write(await metricsEndpoint.get());
