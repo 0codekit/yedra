@@ -103,3 +103,22 @@ test("Validate Refine Double", () => {
     "Error at ``: Must be less than 100.",
   );
 });
+
+test("Validate Refined String Min Custom Message", () => {
+  const schema = string().pattern(/^[a-z]+$/).min(2, "Too short");
+  expect(schema.parse("ab")).toStrictEqual("ab");
+  expect(() => schema.parse("a")).toThrow("Error at ``: Too short.");
+});
+
+test("Validate Refined String Max Custom Message", () => {
+  const schema = string().pattern(/^[a-z]+$/).max(3, "Too long");
+  expect(schema.parse("abc")).toStrictEqual("abc");
+  expect(() => schema.parse("abcd")).toThrow("Error at ``: Too long.");
+});
+
+test("Validate Refined String Length Custom Message", () => {
+  const schema = string().pattern(/^[a-z]+$/).length(3, "Must be 3 chars");
+  expect(schema.parse("abc")).toStrictEqual("abc");
+  expect(() => schema.parse("ab")).toThrow("Error at ``: Must be 3 chars.");
+  expect(() => schema.parse("abcd")).toThrow("Error at ``: Must be 3 chars.");
+});

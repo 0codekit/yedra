@@ -143,7 +143,7 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
    * Set the minimum length/items for strings and arrays.
    * @param value - The minimum constraint.
    */
-  public min(value: number): RefinedSchema<T> {
+  public min(value: number, message?: string): RefinedSchema<T> {
     const docs = this.documentation() as Record<string, unknown>;
     const isArray = docs.type === "array";
     return this.refine(
@@ -151,9 +151,10 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
         const len = (v as string | unknown[]).length;
         return (
           len >= value ||
-          (isArray
-            ? `Must have at least ${value} items`
-            : `Must be at least ${value} characters`)
+          (message ??
+            (isArray
+              ? `Must have at least ${value} items`
+              : `Must be at least ${value} characters`))
         );
       }) as (value: T) => boolean | string,
       isArray ? { minItems: value } : { minLength: value },
@@ -164,7 +165,7 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
    * Set the maximum length/items for strings and arrays.
    * @param value - The maximum constraint.
    */
-  public max(value: number): RefinedSchema<T> {
+  public max(value: number, message?: string): RefinedSchema<T> {
     const docs = this.documentation() as Record<string, unknown>;
     const isArray = docs.type === "array";
     return this.refine(
@@ -172,9 +173,10 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
         const len = (v as string | unknown[]).length;
         return (
           len <= value ||
-          (isArray
-            ? `Must have at most ${value} items`
-            : `Must be at most ${value} characters`)
+          (message ??
+            (isArray
+              ? `Must have at most ${value} items`
+              : `Must be at most ${value} characters`))
         );
       }) as (value: T) => boolean | string,
       isArray ? { maxItems: value } : { maxLength: value },
@@ -185,8 +187,8 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
    * Set the exact length/items for strings and arrays.
    * @param value - The exact constraint.
    */
-  public length(value: number): RefinedSchema<T> {
-    return this.min(value).max(value);
+  public length(value: number, message?: string): RefinedSchema<T> {
+    return this.min(value, message).max(value, message);
   }
 
   public override parse(obj: unknown): T {
@@ -225,9 +227,11 @@ export class ArraySchema<
    * Set the minimum number of items for arrays.
    * @param items - The minimum number of items.
    */
-  public min(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
+  public min(items: number, message?: string): RefinedSchema<Typeof<ItemSchema>[]> {
     return this.refine(
-      (arr) => arr.length >= items || `Must have at least ${items} items`,
+      (arr) =>
+        arr.length >= items ||
+        (message ?? `Must have at least ${items} items`),
       { minItems: items },
     );
   }
@@ -236,9 +240,11 @@ export class ArraySchema<
    * Set the maximum number of items for arrays.
    * @param items - The maximum number of items.
    */
-  public max(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
+  public max(items: number, message?: string): RefinedSchema<Typeof<ItemSchema>[]> {
     return this.refine(
-      (arr) => arr.length <= items || `Must have at most ${items} items`,
+      (arr) =>
+        arr.length <= items ||
+        (message ?? `Must have at most ${items} items`),
       { maxItems: items },
     );
   }
@@ -248,9 +254,11 @@ export class ArraySchema<
    * This is equivalent to calling both min and max.
    * @param items - The number of items.
    */
-  public length(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
-    return this.min(items).refine(
-      (arr) => arr.length <= items || `Must have at most ${items} items`,
+  public length(items: number, message?: string): RefinedSchema<Typeof<ItemSchema>[]> {
+    return this.min(items, message).refine(
+      (arr) =>
+        arr.length <= items ||
+        (message ?? `Must have at most ${items} items`),
       { maxItems: items },
     );
   }
