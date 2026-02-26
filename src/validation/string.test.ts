@@ -144,3 +144,29 @@ test("Validate String Pattern Then Refine Min", () => {
     "Error at ``: Must be at least 2 characters.",
   );
 });
+
+test("Validate String Min Custom Message", () => {
+  const schema = string().min(2, "Too short");
+  expect(schema.parse("ab")).toStrictEqual("ab");
+  expect(() => schema.parse("a")).toThrow("Error at ``: Too short.");
+});
+
+test("Validate String Max Custom Message", () => {
+  const schema = string().max(3, "Too long");
+  expect(schema.parse("abc")).toStrictEqual("abc");
+  expect(() => schema.parse("abcd")).toThrow("Error at ``: Too long.");
+});
+
+test("Validate String Email Custom Message", () => {
+  const schema = string().email("Invalid email");
+  expect(schema.parse("user@example.com")).toStrictEqual("user@example.com");
+  expect(() => schema.parse("not-email")).toThrow(
+    "Error at ``: Invalid email.",
+  );
+});
+
+test("Validate String Pattern Custom Message", () => {
+  const schema = string().pattern(/^[0-9]+$/, "Numbers only");
+  expect(schema.parse("123")).toStrictEqual("123");
+  expect(() => schema.parse("abc")).toThrow("Error at ``: Numbers only.");
+});

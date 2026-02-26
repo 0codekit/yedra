@@ -66,3 +66,28 @@ test("Validate Array Length", () => {
     "Error at ``: Must have at most 3 items.",
   );
 });
+
+test("Validate Array Min Custom Message", () => {
+  const schema = string().array().min(1, "Need at least one");
+  expect(schema.parse(["hello"])).toStrictEqual(["hello"]);
+  expect(() => schema.parse([])).toThrow("Error at ``: Need at least one.");
+});
+
+test("Validate Array Max Custom Message", () => {
+  const schema = string().array().max(2, "Too many items");
+  expect(schema.parse(["a", "b"])).toStrictEqual(["a", "b"]);
+  expect(() => schema.parse(["a", "b", "c"])).toThrow(
+    "Error at ``: Too many items.",
+  );
+});
+
+test("Validate Array Length Custom Message", () => {
+  const schema = string().array().length(2, "Must be exactly two");
+  expect(schema.parse(["a", "b"])).toStrictEqual(["a", "b"]);
+  expect(() => schema.parse(["a"])).toThrow(
+    "Error at ``: Must be exactly two.",
+  );
+  expect(() => schema.parse(["a", "b", "c"])).toThrow(
+    "Error at ``: Must be exactly two.",
+  );
+});

@@ -37,3 +37,15 @@ test("Validate Number Max", () => {
     "Error at ``: Must be at most 100, but was 101.",
   );
 });
+
+test("Validate Number Min Custom Message", () => {
+  const schema = number().min(10, "Too small");
+  expect(schema.parse(10)).toStrictEqual(10);
+  expect(() => schema.parse(9)).toThrow("Error at ``: Too small.");
+});
+
+test("Validate Number Max Custom Message", () => {
+  const schema = number().max(100, "Too large");
+  expect(schema.parse(100)).toStrictEqual(100);
+  expect(() => schema.parse(101)).toThrow("Error at ``: Too large.");
+});
