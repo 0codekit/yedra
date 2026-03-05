@@ -1,7 +1,7 @@
-import { expect, test } from "bun:test";
-import { unknown } from "./unknown.js";
+import { expect, test } from 'bun:test';
+import { unknown } from './unknown.js';
 
-test("Validate Unknown", () => {
+test('Validate Unknown', () => {
   const schema = unknown();
   expect(schema.isOptional()).toBeFalse();
   expect(schema.documentation()).toStrictEqual({});

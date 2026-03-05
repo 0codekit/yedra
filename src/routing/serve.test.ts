@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { Yedra } from './app';
+import { Yedra } from './app.js';
 
 test('Server Static Without Fallback', async () => {
   const context = await new Yedra().listen(27537, {

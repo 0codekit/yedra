@@ -1,7 +1,7 @@
-import type { Typeof } from "./body.js";
-import { DocSchema } from "./doc.js";
-import { Issue, ValidationError } from "./error.js";
-import { Schema } from "./schema.js";
+import type { Typeof } from './body.js';
+import { DocSchema } from './doc.js';
+import { Issue, ValidationError } from './error.js';
+import { Schema } from './schema.js';
 
 export abstract class ModifiableSchema<T> extends Schema<T> {
   /**
@@ -145,7 +145,7 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
    */
   public min(value: number): RefinedSchema<T> {
     const docs = this.documentation() as Record<string, unknown>;
-    const isArray = docs.type === "array";
+    const isArray = docs.type === 'array';
     return this.refine(
       ((v: T) => {
         const len = (v as string | unknown[]).length;
@@ -166,7 +166,7 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
    */
   public max(value: number): RefinedSchema<T> {
     const docs = this.documentation() as Record<string, unknown>;
-    const isArray = docs.type === "array";
+    const isArray = docs.type === 'array';
     return this.refine(
       ((v: T) => {
         const len = (v as string | unknown[]).length;
@@ -195,7 +195,7 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
     if (result === true) {
       return parsed;
     }
-    const message = typeof result === "string" ? result : "Validation failed";
+    const message = typeof result === 'string' ? result : 'Validation failed';
     throw new ValidationError([new Issue([], message)]);
   }
 
@@ -282,7 +282,7 @@ export class ArraySchema<
 
   public documentation(): object {
     return {
-      type: "array",
+      type: 'array',
       items: this.itemSchema.documentation(),
     };
   }

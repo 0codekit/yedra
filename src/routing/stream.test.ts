@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { stream } from '../lib';
-import { Yedra } from './app';
-import { Post } from './rest';
+import { stream } from '../lib.js';
+import { Yedra } from './app.js';
+import { Post } from './rest.js';
 
 const app = new Yedra().use(
   '/stream',
@@ -62,6 +62,7 @@ test('Server Documentation', async () => {
   const response = await fetch('http://localhost:27560/openapi.json');
   expect(await response.json()).toStrictEqual({
     components: {
+      schemas: {},
       securitySchemes: {},
     },
     info: {

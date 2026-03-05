@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { uuid } from './uuid';
+import { uuid } from './uuid.js';
 
 test('Validate UUID', () => {
   const schema = uuid();

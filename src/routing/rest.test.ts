@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { integer, number, object, string } from '../lib';
-import { Yedra } from './app';
-import { Delete, Get, Post, Put } from './rest';
+import { integer, number, object, string } from '../lib.js';
+import { Yedra } from './app.js';
+import { Delete, Get, Post, Put } from './rest.js';
 
 test('Server Basic REST', async () => {
   const app = new Yedra()

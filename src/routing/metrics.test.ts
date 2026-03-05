@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { integer, object } from '../lib';
-import { Yedra } from './app';
-import { Post } from './rest';
+import { integer, object } from '../lib.js';
+import { Yedra } from './app.js';
+import { Post } from './rest.js';
 
 test('Server Metrics', async () => {
   const context = await new Yedra()

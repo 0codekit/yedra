@@ -11,6 +11,7 @@ import mime from 'mime';
 import { WebSocketServer } from 'ws';
 import { Counter } from '../util/counter.js';
 import type { SecurityScheme } from '../util/security.js';
+import { collectLazySchemas } from '../validation/lazy.js';
 import { HttpError } from './errors.js';
 import { Path } from './path.js';
 import { RestEndpoint } from './rest.js';
@@ -540,18 +541,25 @@ export class Yedra {
   private generateDocs(options: DocsData | undefined): object {
     // this set will be filled with the security schemes from all endpoints
     const securitySchemes = new Set<SecurityScheme>();
-    const paths: Record<string, Record<string, object>> = {};
-    for (const route of this.restRoutes) {
-      if (route.endpoint.isHidden()) {
-        // do not include hidden endpoints in the documentation
-        continue;
+
+    // Wrap path generation in collectLazySchemas so that any LazySchema
+    // whose documentation() is called will register its full definition.
+    const { result: paths, schemas } = collectLazySchemas(() => {
+      const paths: Record<string, Record<string, object>> = {};
+      for (const route of this.restRoutes) {
+        if (route.endpoint.isHidden()) {
+          // do not include hidden endpoints in the documentation
+          continue;
+        }
+        const path = route.path.toString();
+        const methods = paths[path] ?? {};
+        methods[route.endpoint.method.toLowerCase()] =
+          route.endpoint.documentation(path, securitySchemes);
+        paths[path] = methods;
       }
-      const path = route.path.toString();
-      const methods = paths[path] ?? {};
-      methods[route.endpoint.method.toLowerCase()] =
-        route.endpoint.documentation(path, securitySchemes);
-      paths[path] = methods;
-    }
+      return paths;
+    });
+
     return {
       openapi: '3.0.2',
       info: {
@@ -567,6 +575,7 @@ export class Yedra {
             .values()
             .map((scheme) => [scheme.name, scheme.scheme]),
         ),
+        schemas: Object.fromEntries(schemas),
       },
       servers: options?.servers ?? [],
       paths,

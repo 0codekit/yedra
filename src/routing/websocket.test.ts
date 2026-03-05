@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { string } from '../lib';
-import { Yedra } from './app';
-import { Ws } from './websocket';
+import { string } from '../lib.js';
+import { Yedra } from './app.js';
+import { Ws } from './websocket.js';
 
 test('WebSocket', async () => {
   const context = await new Yedra()

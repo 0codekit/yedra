@@ -1,25 +1,25 @@
-import { expect, test } from "bun:test";
-import { number } from "./number.js";
-import { laxObject, object } from "./object.js";
-import { string } from "./string.js";
+import { expect, test } from 'bun:test';
+import { number } from './number.js';
+import { laxObject, object } from './object.js';
+import { string } from './string.js';
 
-test("Validate Object", () => {
+test('Validate Object', () => {
   const schema = object({
     num: number(),
     str: string().optional(),
   });
   expect(schema.isOptional()).toBeFalse();
   expect(schema.documentation()).toStrictEqual({
-    type: "object",
+    type: 'object',
     properties: {
       num: {
-        type: "number",
+        type: 'number',
       },
       str: {
-        type: "string",
+        type: 'string',
       },
     },
-    required: ["num"],
+    required: ['num'],
     additionalProperties: false,
   });
   const result: {
@@ -27,12 +27,12 @@ test("Validate Object", () => {
     str?: string;
   } = schema.parse({ num: 3 });
   expect(result).toStrictEqual({ num: 3, str: undefined });
-  expect(schema.parse({ num: 3, str: "hello" })).toStrictEqual({
+  expect(schema.parse({ num: 3, str: 'hello' })).toStrictEqual({
     num: 3,
-    str: "hello",
+    str: 'hello',
   });
-  expect(() => schema.parse({ num: 3, str: "hello", x: "world" })).toThrow(
-    "Error at `x`: Unrecognized.",
+  expect(() => schema.parse({ num: 3, str: 'hello', x: 'world' })).toThrow(
+    'Error at `x`: Unrecognized.',
   );
 });
 
@@ -45,23 +45,23 @@ test('Access Object Shape', () => {
   expect(schema.shape.str.parse('hello')).toStrictEqual('hello');
 });
 
-test("Validate Lax Object", () => {
+test('Validate Lax Object', () => {
   const schema = laxObject({
     num: number(),
     str: string().optional(),
   });
   expect(schema.isOptional()).toBeFalse();
   expect(schema.documentation()).toStrictEqual({
-    type: "object",
+    type: 'object',
     properties: {
       num: {
-        type: "number",
+        type: 'number',
       },
       str: {
-        type: "string",
+        type: 'string',
       },
     },
-    required: ["num"],
+    required: ['num'],
     additionalProperties: true,
   });
   const result: {
@@ -69,12 +69,12 @@ test("Validate Lax Object", () => {
     str?: string;
   } = schema.parse({ num: 3 });
   expect(result).toStrictEqual({ num: 3, str: undefined });
-  expect(schema.parse({ num: 3, str: "hello" })).toStrictEqual({
+  expect(schema.parse({ num: 3, str: 'hello' })).toStrictEqual({
     num: 3,
-    str: "hello",
+    str: 'hello',
   });
-  expect(schema.parse({ num: 3, str: "hello", x: "world" })).toStrictEqual({
+  expect(schema.parse({ num: 3, str: 'hello', x: 'world' })).toStrictEqual({
     num: 3,
-    str: "hello",
+    str: 'hello',
   });
 });

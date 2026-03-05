@@ -1,5 +1,5 @@
 import { expect, jest, test } from 'bun:test';
-import { parseEnv, string, validatePath } from './lib';
+import { parseEnv, string, validatePath } from './lib.js';
 
 test('Validate Path', () => {
   expect(() => validatePath('/test/abc')).not.toThrow();
