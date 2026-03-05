@@ -40,7 +40,7 @@ export function collectLazySchemas<T>(fn: () => T): {
  *   subcategories: Category[];
  * }
  *
- * const category: LazySchema<Category> = y.lazy("Category", () =>
+ * const category: y.LazySchema<Category> = y.lazy("Category", () =>
  *   y.object({
  *     name: y.string(),
  *     subcategories: category.array(),
