@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import type { IncomingMessage, Server, ServerResponse } from 'node:http';
 import { createServer as createHttpServer } from 'node:http';
@@ -52,7 +53,12 @@ class Context {
   }
 }
 
-type ServeFile = { data: Buffer; mime: string };
+type ServeFile = {
+  data: Buffer;
+  mime: string;
+  etag: string;
+  cacheControl: string;
+};
 
 type ServeResponse = {
   status?: number;
@@ -67,6 +73,16 @@ type ServeFallback = (req: {
 type ServeConfig = {
   dir: string;
   fallback?: string | ServeFallback;
+  /**
+   * Files matching `pattern` are served with `Cache-Control: public,
+   * max-age=<maxAge>, immutable`. Intended for content-addressed assets
+   * (e.g. `app.abc12345.js`) whose URL changes when the content changes.
+   * Never matches the fallback file.
+   */
+  immutable?: {
+    pattern: RegExp;
+    maxAge: number;
+  };
 };
 
 type ServeData = {
@@ -240,11 +256,27 @@ class BuiltApp {
           this.serveData.files.get(req.url.pathname) ??
           this.serveData.files.get('__fallback');
         if (staticFile !== undefined) {
+          const ifNoneMatch = req.headers['if-none-match'];
+          const clientEtag = Array.isArray(ifNoneMatch)
+            ? ifNoneMatch[0]
+            : ifNoneMatch;
+          if (clientEtag === staticFile.etag) {
+            return {
+              status: 304,
+              body: Buffer.alloc(0),
+              headers: {
+                etag: staticFile.etag,
+                'cache-control': staticFile.cacheControl,
+              },
+            };
+          }
           return {
             status: 200,
             body: staticFile.data,
             headers: {
               'content-type': staticFile.mime,
+              etag: staticFile.etag,
+              'cache-control': staticFile.cacheControl,
             },
           };
         }
@@ -428,29 +460,54 @@ yedra_request_duration_sum{method="${method}",status="${status}"} ${data?.durati
       );
     });
     const wss = new WebSocketServer({ server });
-    wss.on('connection', async (ws, req) => {
-      const url = new URL(req.url as string, 'http://localhost');
-      const { result } = this.matchWsRoute(url.pathname);
-      if (!result) {
-        ws.close(4404);
-        return;
-      }
-      try {
-        const headers = Object.fromEntries(
-          Object.entries(req.headers).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value.join(',') : (value ?? ''),
-          ]),
-        );
-        await result.endpoint.handle(url, result.params, headers, ws);
-      } catch (error) {
-        if (error instanceof HttpError) {
-          ws.close(4000 + error.status, error.message);
-        } else {
-          console.error(error);
-          ws.close(1011, 'Internal Error');
-        }
-      }
+    wss.on('connection', (ws, req) => {
+      const extractedContext = propagation.extract(
+        context.active(),
+        req.headers,
+      );
+      context.with(extractedContext, () =>
+        trace.getTracer('yedra').startActiveSpan(
+          'incoming_ws_connection',
+          {
+            kind: SpanKind.SERVER,
+          },
+          async (span) => {
+            span.setAttribute('http.url', req.url ?? 'UNKNOWN');
+            let ended = false;
+            const end = () => {
+              if (ended) {
+                return;
+              }
+              ended = true;
+              span.end();
+            };
+            ws.once('close', end);
+            const url = new URL(req.url as string, 'http://localhost');
+            const { result } = this.matchWsRoute(url.pathname);
+            if (!result) {
+              ws.close(4404);
+              end();
+              return;
+            }
+            try {
+              const headers = Object.fromEntries(
+                Object.entries(req.headers).map(([key, value]) => [
+                  key,
+                  Array.isArray(value) ? value.join(',') : (value ?? ''),
+                ]),
+              );
+              await result.endpoint.handle(url, result.params, headers, ws);
+            } catch (error) {
+              if (error instanceof HttpError) {
+                ws.close(4000 + error.status, error.message);
+              } else {
+                console.error(error);
+                ws.close(1011, 'Internal Error');
+              }
+            }
+          },
+        ),
+      );
     });
     server.listen(port, () => {
       if (this.quiet !== true) {
@@ -598,6 +655,7 @@ export class Yedra {
     } catch (_error) {
       files = [];
     }
+    const revalidate = 'public, max-age=0, must-revalidate';
     await Promise.all(
       files.map(async (file) => {
         const absolute = join(config.dir, file);
@@ -605,9 +663,16 @@ export class Yedra {
           return;
         }
         const data = await readFile(absolute);
-        staticFiles.set(`/${file}`, {
+        const urlPath = `/${file}`;
+        const cacheControl =
+          config.immutable !== undefined && config.immutable.pattern.test(file)
+            ? `public, max-age=${config.immutable.maxAge}, immutable`
+            : revalidate;
+        staticFiles.set(urlPath, {
           data,
           mime: mime.getType(extname(file)) ?? 'application/octet-stream',
+          etag: `"${createHash('sha1').update(data).digest('hex')}"`,
+          cacheControl,
         });
       }),
     );
@@ -619,6 +684,8 @@ export class Yedra {
           mime:
             mime.getType(extname(config.fallback)) ??
             'application/octet-stream',
+          etag: `"${createHash('sha1').update(data).digest('hex')}"`,
+          cacheControl: revalidate,
         });
         return {
           files: staticFiles,
