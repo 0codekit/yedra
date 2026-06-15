@@ -98,6 +98,7 @@ type WebSocketOptions<
       params: Typeof<ObjectSchema<Params>>;
       query: Typeof<ObjectSchema<Query>>;
       headers: Typeof<ObjectSchema<Headers>>;
+      rawHeaders: Record<string, string>;
     },
   ) => Promise<void> | void;
 };
@@ -155,6 +156,7 @@ export class Ws<
       params: parsedParams,
       query: parsedQuery,
       headers: parsedHeaders,
+      rawHeaders: headers,
     });
     return undefined;
   }
