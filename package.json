@@ -1,6 +1,6 @@
 {
 	"name": "yedra",
-	"version": "0.20.11",
+	"version": "0.20.12",
 	"repository": "github:0codekit/yedra",
 	"main": "dist/index.js",
 	"exports": {
@@ -17,9 +17,8 @@
 		"@biomejs/biome": "^2.4.5",
 		"@types/bun": "^1.3.10",
 		"@types/node": "^25.3.3",
-		"@types/uuid": "^11.0.0",
 		"@types/ws": "^8.18.1",
-		"typescript": "^5.9.3"
+		"typescript": "^6.0.3"
 	},
 	"bugs": "https://github.com/0codekit/yedra/issues",
 	"contributors": [
@@ -47,7 +46,7 @@
 		"@opentelemetry/api": "^1.9.0",
 		"@standard-schema/spec": "^1.1.0",
 		"mime": "^4.1.0",
-		"uuid": "^13.0.0",
+		"uuid": "^14.0.0",
 		"ws": "^8.19.0"
 	}
 }

@@ -2,6 +2,7 @@
   "compilerOptions": {
     "declaration": true,
     "outDir": "dist",
+    "rootDir": "./src",
 
     "lib": ["ESNext"],
     "target": "ES2020",

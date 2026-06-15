@@ -10,9 +10,11 @@ import { BadRequestError } from './errors.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
   url: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   params: Params;
   query: Query;
   headers: Headers;
+  rawHeaders: Record<string, string>;
   body: Body;
 };
 
@@ -182,12 +184,14 @@ class ConcreteRestEndpoint<
     }
     return await this.options.do({
       url: req.url,
+      method: this._method,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       params: parsedParams!,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       query: parsedQuery!,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       headers: parsedHeaders!,
+      rawHeaders: req.headers,
       // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
       body: parsedBody!,
     });
