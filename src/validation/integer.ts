@@ -58,7 +58,7 @@ class IntegerSchema extends ModifiableSchema<number> {
     return num;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'integer',
       ...(this.minValue !== undefined && { minimum: this.minValue }),

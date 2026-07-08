@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { Yedra } from '../routing/app.js';
 import { Get } from '../routing/rest.js';
-import { type LazySchema, collectLazySchemas, lazy } from './lazy.js';
+import { collectLazySchemas, type LazySchema, lazy } from './lazy.js';
 import { number } from './number.js';
 import { object } from './object.js';
 import { string } from './string.js';
@@ -65,7 +65,7 @@ test('Lazy schema rejects invalid recursive data', () => {
   ).toThrow();
 });
 
-test('Lazy schema documentation always returns $ref', () => {
+test('Lazy schema documentation is self-contained without a context', () => {
   interface TreeNode {
     value: number;
     children: TreeNode[];
@@ -78,8 +78,24 @@ test('Lazy schema documentation always returns $ref', () => {
     }),
   );
 
+  // Called without an ambient context, documentation() establishes a
+  // self-contained JSON Schema: a `$ref` into a bundled `$defs` block.
   expect(treeNode.documentation()).toStrictEqual({
-    $ref: '#/components/schemas/DocTreeNode',
+    $ref: '#/$defs/DocTreeNode',
+    $defs: {
+      DocTreeNode: {
+        type: 'object',
+        properties: {
+          value: { type: 'number' },
+          children: {
+            type: 'array',
+            items: { $ref: '#/$defs/DocTreeNode' },
+          },
+        },
+        required: ['value', 'children'],
+        additionalProperties: false,
+      },
+    },
   });
 });
 

@@ -7,7 +7,7 @@ test('Validate Optional', () => {
   const schema = number().optional().describe('Optional', 3);
   expect(schema.documentation()).toStrictEqual({
     description: 'Optional',
-    example: 3,
+    examples: [3],
     type: 'number',
   });
   expect(schema.isOptional()).toBeTrue();

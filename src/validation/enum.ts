@@ -39,7 +39,7 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
     return this.options[index];
   }
 
-  public documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'string',
       enum: this.options,

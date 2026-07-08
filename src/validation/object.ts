@@ -81,7 +81,7 @@ export class ObjectSchema<
     return result;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     const properties: Record<string, object> = {};
     const required: string[] = [];
     for (const prop in this.shape) {

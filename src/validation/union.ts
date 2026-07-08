@@ -29,7 +29,7 @@ class UnionSchema<T extends [...Schema<unknown>[]]> extends ModifiableSchema<
     throw new ValidationError(issues);
   }
 
-  public documentation(): object {
+  protected override buildDocs(): object {
     return {
       anyOf: this.options.map((option) => option.documentation()),
     };

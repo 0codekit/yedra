@@ -55,7 +55,7 @@ class StringSchema extends ModifiableSchema<string> {
     return obj;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'string',
     };

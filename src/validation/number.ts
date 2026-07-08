@@ -52,7 +52,7 @@ class NumberSchema extends ModifiableSchema<number> {
     return num;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'number',
       ...(this.minValue !== undefined && { minimum: this.minValue }),

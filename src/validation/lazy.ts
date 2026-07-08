@@ -1,31 +1,24 @@
+import {
+  createDocsContext,
+  registerNamedSchema,
+  withDocsContext,
+} from './context.js';
 import { ModifiableSchema } from './modifiable.js';
 import type { Schema } from './schema.js';
 
 /**
- * Temporary context used during OpenAPI doc generation to accumulate
- * lazy schema definitions. Set by `collectLazySchemas()`, read by
- * `LazySchema.documentation()`. Not a persistent global registry —
- * only lives for the duration of a single doc generation call.
- */
-let schemaCollector: Map<string, object> | null = null;
-
-/**
- * Run a function while collecting lazy schema definitions.
- * Any `LazySchema` whose `documentation()` is called during `fn`
- * will register its full definition in the returned map.
+ * Run a function while collecting schema definitions for OpenAPI output.
+ * Any `LazySchema` (or `ReuseSchema`) whose `documentation()` is called
+ * during `fn` registers its full definition in the returned map, keyed by
+ * name, with refs pointing into `#/components/schemas/...`.
  */
 export function collectLazySchemas<T>(fn: () => T): {
   result: T;
   schemas: Map<string, object>;
 } {
-  const schemas = new Map<string, object>();
-  schemaCollector = schemas;
-  try {
-    const result = fn();
-    return { result, schemas };
-  } finally {
-    schemaCollector = null;
-  }
+  const context = createDocsContext('openapi');
+  const result = withDocsContext(context, fn);
+  return { result, schemas: context.schemas };
 }
 
 /**
@@ -62,19 +55,10 @@ export class LazySchema<T> extends ModifiableSchema<T> {
     return this.getter().parse(obj);
   }
 
-  public override documentation(): object {
-    if (schemaCollector && !schemaCollector.has(this.schemaName)) {
-      this.registerSchema(schemaCollector);
-    }
-    return { $ref: `#/components/schemas/${this.schemaName}` };
-  }
-
-  private registerSchema(collector: Map<string, object>): void {
-    // Set a placeholder first to break infinite recursion —
-    // if the getter references this schema, documentation()
-    // will see the key already exists and skip re-registration.
-    collector.set(this.schemaName, {});
-    collector.set(this.schemaName, this.getter().documentation());
+  protected override buildDocs(): object {
+    return registerNamedSchema(this.schemaName, () =>
+      this.getter().documentation(),
+    );
   }
 
   public override isOptional(): boolean {
@@ -84,7 +68,8 @@ export class LazySchema<T> extends ModifiableSchema<T> {
 
 /**
  * Create a lazily-evaluated schema for recursive type definitions.
- * @param name - The schema name, used for `$ref` in OpenAPI documentation.
+ * @param name - The schema name, used for the `$ref` pointer and the key
+ *   under `$defs` (bare JSON Schema) or `components.schemas` (OpenAPI).
  * @param getter - A function that returns the schema. Called at
  *   parse time, not at definition time, so circular references
  *   are safe.

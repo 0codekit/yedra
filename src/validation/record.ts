@@ -43,7 +43,7 @@ class RecordSchema<
     return result;
   }
 
-  public documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'object',
       additionalProperties: this.valueSchema.documentation(),

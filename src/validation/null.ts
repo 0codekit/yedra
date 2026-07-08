@@ -11,7 +11,7 @@ class NullSchema extends ModifiableSchema<null> {
     return null;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'null',
     };

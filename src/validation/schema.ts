@@ -1,6 +1,11 @@
 import type { Readable } from 'node:stream';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { BodyType } from './body.js';
+import {
+  createDocsContext,
+  currentDocsContext,
+  withDocsContext,
+} from './context.js';
 import { Issue, ValidationError } from './error.js';
 
 /**
@@ -48,8 +53,39 @@ export abstract class Schema<T>
 
   /**
    * Generate a JSON schema for this schema.
+   *
+   * When called without an ambient documentation context, this establishes
+   * a self-contained JSON Schema context: any named schemas below it
+   * (`y.lazy`, `y.reuse`) are collected and bundled into a top-level `$defs`
+   * block, producing a standalone, valid JSON Schema document. When called
+   * within an existing context (e.g. during OpenAPI generation, or as a
+   * nested node), it defers to that context and simply emits this node's
+   * fragment.
    */
-  public abstract documentation(): object;
+  public documentation(): object {
+    if (currentDocsContext() !== null) {
+      // Already inside a context: emit just this node's fragment. Any named
+      // definitions are collected by whoever owns the context.
+      return this.buildDocs();
+    }
+    // Top-level call: become the root and bundle a self-contained document.
+    const context = createDocsContext('json-schema');
+    return withDocsContext(context, () => {
+      const body = this.buildDocs();
+      if (context.schemas.size === 0) {
+        return body;
+      }
+      return { ...body, $defs: Object.fromEntries(context.schemas) };
+    });
+  }
+
+  /**
+   * Build this schema's JSON Schema fragment. Called by `documentation()`
+   * within an active context. Recursive calls to child schemas should use
+   * their public `documentation()`, which transparently defers to the
+   * active context.
+   */
+  protected abstract buildDocs(): object;
 
   /**
    * Whether the schema is allowed to be optional.

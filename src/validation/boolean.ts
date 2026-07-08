@@ -17,7 +17,7 @@ class BooleanSchema extends ModifiableSchema<boolean> {
     return obj;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'boolean',
     };

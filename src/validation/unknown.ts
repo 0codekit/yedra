@@ -5,7 +5,7 @@ class UnknownSchema extends ModifiableSchema<unknown> {
     return obj;
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {};
   }
 }

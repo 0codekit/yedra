@@ -17,7 +17,7 @@ class DateSchema extends ModifiableSchema<Date> {
     ]);
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'string',
       format: 'date-time',

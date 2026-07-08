@@ -77,7 +77,7 @@ class OptionalSchema<T> extends Schema<T | undefined> {
     return this.schema.parse(obj);
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return this.schema.documentation();
   }
 
@@ -111,7 +111,7 @@ class DefaultSchema<T> extends Schema<T> {
     return this.schema.parse(obj);
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       ...this.schema.documentation(),
       default: this.defaultValue,
@@ -199,7 +199,7 @@ export class RefinedSchema<T> extends ModifiableSchema<T> {
     throw new ValidationError([new Issue([], message)]);
   }
 
-  public override documentation(): object {
+  protected override buildDocs(): object {
     return {
       ...this.schema.documentation(),
       ...this.docs,
@@ -280,7 +280,7 @@ export class ArraySchema<
     return elems;
   }
 
-  public documentation(): object {
+  protected override buildDocs(): object {
     return {
       type: 'array',
       items: this.itemSchema.documentation(),
