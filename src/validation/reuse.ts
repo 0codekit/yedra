@@ -25,7 +25,7 @@ export class ReuseSchema<T> extends ModifiableSchema<T> {
   }
 
   protected override buildDocs(): object {
-    return registerNamedSchema(this.schemaName, () =>
+    return registerNamedSchema(this.schemaName, this, () =>
       this.schema.documentation(),
     );
   }

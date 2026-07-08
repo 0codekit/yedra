@@ -48,6 +48,45 @@ test('reuse deduplicates a shared schema into a single $defs entry', () => {
   });
 });
 
+test('reuse throws when a name maps to divergent schemas', () => {
+  const a = reuse('User', object({ id: uuid() }));
+  const b = reuse('User', object({ email: string() }));
+  const schema = object({ a, b });
+
+  expect(() => schema.documentation()).toThrow(
+    'Conflicting definitions for reused schema "User"',
+  );
+});
+
+test('reuse allows structurally identical schemas under the same name', () => {
+  // Two distinct instances that build to the same definition are not a
+  // conflict — the `$ref` represents both faithfully.
+  const a = reuse('User', object({ id: uuid(), name: string() }));
+  const b = reuse('User', object({ id: uuid(), name: string() }));
+  const schema = object({ a, b });
+
+  expect(schema.documentation()).toStrictEqual({
+    type: 'object',
+    properties: {
+      a: { $ref: '#/$defs/User' },
+      b: { $ref: '#/$defs/User' },
+    },
+    required: ['a', 'b'],
+    additionalProperties: false,
+    $defs: {
+      User: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          name: { type: 'string' },
+        },
+        required: ['id', 'name'],
+        additionalProperties: false,
+      },
+    },
+  });
+});
+
 test('reuse under the OpenAPI context uses components/schemas refs', () => {
   const user = reuse('User', object({ id: uuid(), name: string() }));
   const schema = object({ author: user });
