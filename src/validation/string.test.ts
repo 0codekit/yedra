@@ -1,9 +1,9 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { string } from './string.js';
 
 test('Validate String', () => {
   const schema = string();
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'string',
   });
@@ -15,7 +15,7 @@ test('Validate String', () => {
 
 test('Validate String Pattern', () => {
   const schema = string().pattern(/^[0-9]+$/);
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'string',
     pattern: '^[0-9]+$',
@@ -43,7 +43,7 @@ test('Validate String Min', () => {
 
 test('Validate String Email', () => {
   const schema = string().email();
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'string',
     format: 'email',
@@ -59,7 +59,7 @@ test('Validate String Email', () => {
 
 test('Validate String Email Optional', () => {
   const schema = string().email().optional();
-  expect(schema.isOptional()).toBeTrue();
+  expect(schema.isOptional()).toBe(true);
   expect(schema.parse('user@example.com')).toStrictEqual('user@example.com');
   expect(schema.parse(undefined)).toBeUndefined();
 });

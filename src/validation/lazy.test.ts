@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { Yedra } from '../routing/app.js';
 import { Get } from '../routing/rest.js';
 import { type LazySchema, collectLazySchemas, lazy } from './lazy.js';
@@ -41,7 +41,7 @@ test('Lazy schema supports recursive types', () => {
   expect(result.name).toBe('root');
   expect(result.subcategories).toHaveLength(2);
   expect(result.subcategories[1].subcategories[0].name).toBe('grandchild');
-  expect(category.isOptional()).toBeFalse();
+  expect(category.isOptional()).toBe(false);
 });
 
 test('Lazy schema rejects invalid recursive data', () => {

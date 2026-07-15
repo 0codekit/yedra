@@ -1,11 +1,11 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { number } from './number.js';
 import { string } from './string.js';
 import { union } from './union.js';
 
 test('Validate Union', () => {
   const schema = union(string(), number());
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     anyOf: [
       {

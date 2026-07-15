@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { number } from './number.js';
 import { laxObject, object } from './object.js';
 import { string } from './string.js';
@@ -8,7 +8,7 @@ test('Validate Object', () => {
     num: number(),
     str: string().optional(),
   });
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'object',
     properties: {
@@ -50,7 +50,7 @@ test('Validate Lax Object', () => {
     num: number(),
     str: string().optional(),
   });
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'object',
     properties: {

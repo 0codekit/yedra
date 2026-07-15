@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { string } from '../lib.js';
 import { Yedra } from './app.js';
 import { Ws } from './websocket.js';

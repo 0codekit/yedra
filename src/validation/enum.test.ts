@@ -1,9 +1,9 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { _enum } from './enum.js';
 
 test('Validate Enum', () => {
   const schema = _enum(3, 4, 'hello');
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'string',
     enum: [3, 4, 'hello'],

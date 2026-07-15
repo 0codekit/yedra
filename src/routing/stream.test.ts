@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { stream } from '../lib.js';
 import { Yedra } from './app.js';
 import { Post } from './rest.js';
@@ -36,7 +36,7 @@ test('Server Stream', async () => {
     async start(controller) {
       for (const c of 'Hello, world!') {
         controller.enqueue(c);
-        await Bun.sleep(10);
+        await new Promise((resolve) => setTimeout(resolve, 10));
       }
       controller.close();
     },
@@ -44,7 +44,8 @@ test('Server Stream', async () => {
   const response = await fetch('http://localhost:27536/stream', {
     method: 'POST',
     body: input,
-  });
+    duplex: 'half',
+  } as RequestInit & { duplex: 'half' });
   expect(response.status).toBe(200);
   expect(await response.text()).toStrictEqual('Hello, world!');
   await context.stop();

@@ -1,9 +1,9 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { number } from './number.js';
 
 test('Doc Schema', () => {
   const schema = number().describe('My Description.', 3);
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'number',
     description: 'My Description.',

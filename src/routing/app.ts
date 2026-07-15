@@ -83,11 +83,31 @@ type ServeConfig = {
     pattern: RegExp;
     maxAge: number;
   };
+  /**
+   * Extra headers added to every static file response, including `304 Not
+   * Modified` and fallback responses. Useful for e.g. CORS headers. Headers
+   * returned by a function fallback take precedence over these.
+   *
+   * Either a fixed record applied to every static response, or a function
+   * called per request. The function receives the request URL and headers
+   * (e.g. `origin`), so it can restrict CORS to specific paths or origins;
+   * return an empty record to add nothing.
+   */
+  headers?: ServeHeaders;
 };
+
+type ServeHeaders =
+  | Record<string, string>
+  | ((req: {
+      href: string;
+      pathname: string;
+      headers: Record<string, string | string[] | undefined>;
+    }) => Record<string, string>);
 
 type ServeData = {
   files: Map<string, ServeFile>;
   fallback: ServeFallback | undefined;
+  headers: ServeHeaders | undefined;
 };
 
 type DocsData = {
@@ -255,6 +275,7 @@ class BuiltApp {
         const staticFile =
           this.serveData.files.get(req.url.pathname) ??
           this.serveData.files.get('__fallback');
+        const serveHeaders = this.resolveServeHeaders(req);
         if (staticFile !== undefined) {
           const ifNoneMatch = req.headers['if-none-match'];
           const clientEtag = Array.isArray(ifNoneMatch)
@@ -265,6 +286,7 @@ class BuiltApp {
               status: 304,
               body: Buffer.alloc(0),
               headers: {
+                ...serveHeaders,
                 etag: staticFile.etag,
                 'cache-control': staticFile.cacheControl,
               },
@@ -274,6 +296,7 @@ class BuiltApp {
             status: 200,
             body: staticFile.data,
             headers: {
+              ...serveHeaders,
               'content-type': staticFile.mime,
               etag: staticFile.etag,
               'cache-control': staticFile.cacheControl,
@@ -290,7 +313,10 @@ class BuiltApp {
               body: isUint8Array(response.body)
                 ? response.body
                 : Buffer.from(response.body, 'utf-8'),
-              headers: response.headers,
+              headers: {
+                ...serveHeaders,
+                ...response.headers,
+              },
             };
           } catch (error) {
             if (error instanceof HttpError) {
@@ -337,6 +363,24 @@ class BuiltApp {
       console.error(error);
       return BuiltApp.errorResponse(500, 'Internal Server Error.');
     }
+  }
+
+  private resolveServeHeaders(req: {
+    url: URL;
+    headers: Record<string, string | string[] | undefined>;
+  }): Record<string, string> {
+    const headers = this.serveData.headers;
+    if (headers === undefined) {
+      return {};
+    }
+    if (typeof headers === 'function') {
+      return headers({
+        href: req.url.href,
+        pathname: req.url.pathname,
+        headers: req.headers,
+      });
+    }
+    return headers;
   }
 
   private static errorResponse(
@@ -646,6 +690,7 @@ export class Yedra {
       return {
         files: new Map(),
         fallback: undefined,
+        headers: undefined,
       };
     }
     const staticFiles = new Map<string, ServeFile>();
@@ -690,16 +735,19 @@ export class Yedra {
         return {
           files: staticFiles,
           fallback: undefined,
+          headers: config.headers,
         };
       }
       return {
         files: staticFiles,
         fallback: config.fallback,
+        headers: config.headers,
       };
     }
     return {
       files: staticFiles,
       fallback: undefined,
+      headers: config.headers,
     };
   }
 

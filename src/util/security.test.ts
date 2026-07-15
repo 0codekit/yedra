@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { Yedra } from '../routing/app.js';
 import { Get } from '../routing/rest.js';
 import { object } from '../validation/object.js';

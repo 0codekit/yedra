@@ -1,10 +1,10 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { number } from './number.js';
 import { record } from './record.js';
 
 test('Validate Record', () => {
   const schema = record(number());
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'object',
     additionalProperties: {

@@ -1,9 +1,9 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { uuid } from './uuid.js';
 
 test('Validate UUID', () => {
   const schema = uuid();
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'string',
   });

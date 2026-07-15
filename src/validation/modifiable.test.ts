@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { number } from './number.js';
 import { laxObject } from './object.js';
 import { string } from './string.js';
@@ -10,7 +10,7 @@ test('Validate Optional', () => {
     example: 3,
     type: 'number',
   });
-  expect(schema.isOptional()).toBeTrue();
+  expect(schema.isOptional()).toBe(true);
   expect(schema.parse(3)).toStrictEqual(3);
   expect(schema.parse(undefined)).toBeUndefined();
   expect(() => schema.parse('hello')).toThrow(
@@ -20,7 +20,7 @@ test('Validate Optional', () => {
 
 test('Validate Default Undefined', () => {
   const schema = number().default(0);
-  expect(schema.isOptional()).toBeTrue();
+  expect(schema.isOptional()).toBe(true);
   expect(schema.parse(undefined)).toStrictEqual(0);
 });
 
@@ -87,7 +87,7 @@ test('Validate Refine Chaining Optional', () => {
   const schema = string()
     .refine((s) => s.length > 0 || 'Required')
     .optional();
-  expect(schema.isOptional()).toBeTrue();
+  expect(schema.isOptional()).toBe(true);
   expect(schema.parse(undefined)).toBeUndefined();
   expect(schema.parse('a')).toStrictEqual('a');
   expect(() => schema.parse('')).toThrow('Error at ``: Required.');

@@ -1,4 +1,4 @@
-import { expect, jest, test } from 'bun:test';
+import { expect, test, vi } from 'vitest';
 import { parseEnv, string, validatePath } from './lib.js';
 
 test('Validate Path', () => {
@@ -18,8 +18,8 @@ test('Parse Env', () => {
     A: 'Hello',
     B: 'World',
   });
-  const errorMock = jest.fn();
-  const exitMock = jest.fn(() => undefined as never);
+  const errorMock = vi.fn();
+  const exitMock = vi.fn(() => undefined as never);
   const oldError = console.error;
   const oldExit = process.exit;
   console.error = errorMock;

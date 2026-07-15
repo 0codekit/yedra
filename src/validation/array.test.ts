@@ -1,10 +1,10 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { number } from './number.js';
 import { string } from './string.js';
 
 test('Validate Array', () => {
   const schema = number().array();
-  expect(schema.isOptional()).toBeFalse();
+  expect(schema.isOptional()).toBe(false);
   expect(schema.documentation()).toStrictEqual({
     type: 'array',
     items: {

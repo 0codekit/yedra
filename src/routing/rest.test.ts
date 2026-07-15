@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { integer, number, object, string } from '../lib.js';
 import { Yedra } from './app.js';
 import { Delete, Get, Post, Put } from './rest.js';
