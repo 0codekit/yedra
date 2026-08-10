@@ -20,6 +20,16 @@ test('Validate Integer', () => {
   );
 });
 
+test('Validate Integer Rejects Partially Numeric Strings', () => {
+  const schema = integer();
+  expect(() => schema.parse('25px')).toThrow(
+    'Error at ``: Expected integer but got string.',
+  );
+  expect(() => schema.parse('')).toThrow(
+    'Error at ``: Expected integer but got string.',
+  );
+});
+
 test('Validate Integer Min', () => {
   const schema = integer().min(10);
   expect(schema.documentation()).toStrictEqual({
@@ -42,4 +52,17 @@ test('Validate Integer Max', () => {
   expect(() => schema.parse(101)).toThrow(
     'Error at ``: Must be at most 100, but was 101.',
   );
+});
+
+test('Validate Integer Rejects Non-Decimal And Non-Finite Values', () => {
+  const schema = integer();
+  for (const input of ['0x10', '0b101', 'Infinity']) {
+    expect(() => schema.parse(input)).toThrow(
+      'Error at ``: Expected integer but got string.',
+    );
+  }
+  expect(() => schema.parse(Number.POSITIVE_INFINITY)).toThrow(
+    'Error at ``: Expected integer but got number.',
+  );
+  expect(schema.parse('1e3')).toStrictEqual(1000);
 });

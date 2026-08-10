@@ -91,14 +91,14 @@ test('Server Basic REST', async () => {
         },
       }),
     );
-  const context = await app.listen(27534, { quiet: true });
-  const response1 = await fetch('http://localhost:27534');
+  const context = await app.listen(0, { quiet: true });
+  const response1 = await fetch(`http://localhost:${context.port}`);
   expect(response1.status).toBe(200);
   expect(response1.headers.get('content-type')).toStrictEqual(
     'application/json',
   );
   expect(await response1.json()).toStrictEqual({ a: 3 });
-  const response2 = await fetch('http://localhost:27534/test', {
+  const response2 = await fetch(`http://localhost:${context.port}/test`, {
     method: 'POST',
     body: JSON.stringify({
       hello: 17,
@@ -109,20 +109,26 @@ test('Server Basic REST', async () => {
   });
   expect(response2.status).toBe(200);
   expect(await response2.json()).toStrictEqual({ a: 17 });
-  const response3 = await fetch('http://localhost:27534/subdir/test', {
-    method: 'PUT',
-    body: JSON.stringify({
-      x: 2,
-    }),
-    headers: {
-      'content-type': 'application/json',
+  const response3 = await fetch(
+    `http://localhost:${context.port}/subdir/test`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        x: 2,
+      }),
+      headers: {
+        'content-type': 'application/json',
+      },
     },
-  });
+  );
   expect(response3.status).toBe(200);
   expect(await response3.json()).toStrictEqual({ y: 2 });
-  const response4 = await fetch('http://localhost:27534/subdir/test', {
-    method: 'DELETE',
-  });
+  const response4 = await fetch(
+    `http://localhost:${context.port}/subdir/test`,
+    {
+      method: 'DELETE',
+    },
+  );
   expect(response4.status).toBe(200);
   expect(await response4.json()).toStrictEqual({ test: 'Hello, world!' });
   await context.stop();
@@ -145,10 +151,10 @@ test('Server Method Not Allowed', async () => {
       },
     }),
   );
-  const context = await app.listen(27535, { quiet: true });
-  const response1 = await fetch('http://localhost:27535/test');
+  const context = await app.listen(0, { quiet: true });
+  const response1 = await fetch(`http://localhost:${context.port}/test`);
   expect(response1.status).toBe(200);
-  const response2 = await fetch('http://localhost:27535/test', {
+  const response2 = await fetch(`http://localhost:${context.port}/test`, {
     method: 'POST',
   });
   expect(response2.status).toBe(405);
@@ -157,10 +163,58 @@ test('Server Method Not Allowed', async () => {
     errorMessage: 'Method POST not allowed for path `/test`.',
     code: 'method_not_allowed',
   });
-  const response3 = await fetch('http://localhost:27535/test', {
+  // the 405 names the methods that would work
+  expect(response2.headers.get('allow')).toBe('GET, HEAD, OPTIONS');
+  // HEAD is answered like GET, without a body
+  const response3 = await fetch(`http://localhost:${context.port}/test`, {
     method: 'HEAD',
   });
-  console.log(await response3.text());
-  expect(response3.status).toBe(405);
+  expect(response3.status).toBe(200);
+  expect(await response3.text()).toStrictEqual('');
+  await context.stop();
+});
+
+test('A Content-Type With Parameters Is Accepted', async () => {
+  // `application/json; charset=utf-8` is a perfectly ordinary thing to send,
+  // and comparing the whole header verbatim answered all of it with a 400
+  const context = await new Yedra()
+    .use(
+      '/thing',
+      new Post({
+        category: 'Test',
+        summary: 'Create.',
+        params: {},
+        query: {},
+        headers: {},
+        req: object({ name: string() }),
+        res: object({ name: string() }),
+        do: (req) => ({ body: { name: req.body.name } }),
+      }),
+    )
+    .listen(0, { quiet: true });
+  for (const contentType of [
+    'application/json',
+    'application/json; charset=utf-8',
+    'application/json;charset=UTF-8',
+    'Application/JSON',
+  ]) {
+    const response = await fetch(`http://localhost:${context.port}/thing`, {
+      method: 'POST',
+      headers: { 'content-type': contentType },
+      body: JSON.stringify({ name: 'yedra' }),
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toStrictEqual({ name: 'yedra' });
+  }
+  // a genuinely wrong type is still refused, and reported without parameters
+  const wrong = await fetch(`http://localhost:${context.port}/thing`, {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain; charset=utf-8' },
+    body: JSON.stringify({ name: 'yedra' }),
+  });
+  expect(wrong.status).toBe(400);
+  expect(((await wrong.json()) as { errorMessage: string }).errorMessage).toBe(
+    'Error at `body`: Expected content type `application/json`, but got `text/plain`.',
+  );
   await context.stop();
 });

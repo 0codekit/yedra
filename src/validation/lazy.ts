@@ -10,6 +10,13 @@ import type { Schema } from './schema.js';
 let schemaCollector: Map<string, object> | null = null;
 
 /**
+ * Which schema claimed each name during the current collection, so that two
+ * different schemas sharing a name can be reported rather than silently
+ * collapsing into one definition.
+ */
+let schemaOwners: Map<string, LazySchema<unknown>> | null = null;
+
+/**
  * Run a function while collecting lazy schema definitions.
  * Any `LazySchema` whose `documentation()` is called during `fn`
  * will register its full definition in the returned map.
@@ -20,11 +27,13 @@ export function collectLazySchemas<T>(fn: () => T): {
 } {
   const schemas = new Map<string, object>();
   schemaCollector = schemas;
+  schemaOwners = new Map();
   try {
     const result = fn();
     return { result, schemas };
   } finally {
     schemaCollector = null;
+    schemaOwners = null;
   }
 }
 
@@ -58,13 +67,22 @@ export class LazySchema<T> extends ModifiableSchema<T> {
     this.getter = getter;
   }
 
-  public override parse(obj: unknown): T {
+  protected override parseValue(obj: unknown): T {
     return this.getter().parse(obj);
   }
 
-  public override documentation(): object {
-    if (schemaCollector && !schemaCollector.has(this.schemaName)) {
-      this.registerSchema(schemaCollector);
+  protected override baseDocumentation(): object {
+    if (schemaCollector) {
+      const owner = schemaOwners?.get(this.schemaName);
+      if (owner !== undefined && owner !== this) {
+        throw new Error(
+          `Duplicate lazy schema name \`${this.schemaName}\`: two different schemas cannot share a name, because the generated documentation refers to both by it.`,
+        );
+      }
+      if (!schemaCollector.has(this.schemaName)) {
+        schemaOwners?.set(this.schemaName, this as LazySchema<unknown>);
+        this.registerSchema(schemaCollector);
+      }
     }
     return { $ref: `#/components/schemas/${this.schemaName}` };
   }

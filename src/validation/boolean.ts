@@ -2,7 +2,9 @@ import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 
 class BooleanSchema extends ModifiableSchema<boolean> {
-  public override parse(obj: unknown): boolean {
+  protected override parseValue(obj: unknown): boolean {
+    // Query parameters and headers are always strings, so the two spellings
+    // a boolean can have there are coerced.
     if (obj === 'true') {
       return true;
     }
@@ -17,7 +19,7 @@ class BooleanSchema extends ModifiableSchema<boolean> {
     return obj;
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       type: 'boolean',
     };

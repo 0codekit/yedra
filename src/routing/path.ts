@@ -1,3 +1,5 @@
+const VALID_SEGMENT = /^((:?[A-Za-z0-9\-.]+\??)|\*)$/;
+
 /**
  * Represents an HTTP API path. Provides methods for concatenating paths and
  * extracting path parameters from strings.
@@ -18,11 +20,11 @@ export class Path {
       throw new Error(`API path ${path} is invalid: Must start with '/'.`);
     }
     this.expected = path
-      .substring(1)
+      .slice(1)
       .split('/')
       .filter((segment) => segment !== '');
     const invalidSegment = this.expected.find(
-      (part) => part.match(/^((:?[A-Za-z0-9\-.]+\??)|\*)$/) === null,
+      (part) => part.match(VALID_SEGMENT) === null,
     );
     if (invalidSegment) {
       throw new Error(
@@ -61,7 +63,7 @@ export class Path {
    * @returns The path as a string.
    */
   public toString(): string {
-    return `/${this.expected.map((segment) => (segment.startsWith(':') ? `{${segment.substring(1)}}` : segment)).join('/')}`;
+    return `/${this.expected.map((segment) => (segment.startsWith(':') ? `{${segment.slice(1)}}` : segment)).join('/')}`;
   }
 
   /**
@@ -76,35 +78,49 @@ export class Path {
   ): { params: Record<string, string>; score: number } | undefined {
     const params: Record<string, string> = {};
     const actual = path
-      .substring(1)
+      .slice(1)
       .split('/')
       .filter((segment) => segment !== '');
     if (this.expected.length < actual.length && !this.expected.includes('*')) {
       // path cannot be longer than expected, unless it contains a wildcard
-      return undefined;
+      return;
     }
     for (let i = 0; i < actual.length; ++i) {
-      if (this.expected[i] === '*') {
+      const expected = this.expected[i];
+      const raw = actual[i];
+      if (expected === undefined || raw === undefined) {
+        // only reachable if the length check above did not apply
+        return;
+      }
+      if (expected === '*') {
         // wildcard, parsing successful
         return { params, score: Number.POSITIVE_INFINITY };
       }
-      if (this.expected[i].startsWith(':')) {
+      // Percent-encoding has to be undone per segment rather than on the whole
+      // path, so that an encoded `/` inside a value stays inside that value.
+      const segment = Path.decode(raw);
+      if (segment === undefined) {
+        return;
+      }
+      if (expected.startsWith(':')) {
         // parameter, accept anything
-        params[Path.normalizeParam(this.expected[i])] = actual[i];
+        params[Path.normalizeParam(expected)] = segment;
       } else if (
-        Path.normalizeParam(this.expected[i]) !== actual[i].toLowerCase()
+        Path.normalizeParam(expected).toLowerCase() !== segment.toLowerCase()
       ) {
         // not a parameter, and the values don't match
-        return undefined;
+        return;
       }
     }
+    const next = this.expected[actual.length];
     if (
       actual.length < this.expected.length &&
-      !this.expected[actual.length].endsWith('?') &&
-      this.expected[actual.length] !== '*'
+      next !== undefined &&
+      !next.endsWith('?') &&
+      next !== '*'
     ) {
       // path is incomplete
-      return undefined;
+      return;
     }
     return {
       params,
@@ -115,17 +131,58 @@ export class Path {
   }
 
   /**
+   * A string identifying which URLs this path matches, with parameter names
+   * erased. Two paths with the same signature are interchangeable — `/a/:id`
+   * and `/a/:slug` both match exactly the same requests — so this is what
+   * duplicate registration has to compare, rather than the paths themselves.
+   */
+  public signature(): string {
+    return this.expected
+      .map((segment) => {
+        if (segment === '*') {
+          return '*';
+        }
+        if (segment.startsWith(':')) {
+          return segment.endsWith('?') ? ':?' : ':';
+        }
+        return segment.toLowerCase();
+      })
+      .join('/');
+  }
+
+  /**
+   * Percent-decode a path segment, or return undefined if it is malformed.
+   * @param segment - The raw segment.
+   */
+  private static decode(segment: string): string | undefined {
+    try {
+      return decodeURIComponent(segment);
+    } catch {
+      // a malformed escape such as `%zz`
+      return;
+    }
+  }
+
+  /**
    * Remove `:` and `?` from a parameter path segment.
    * @param param - The path segment.
    */
   private static normalizeParam(param: string): string {
     let result = param;
     if (result.startsWith(':')) {
-      result = result.substring(1);
+      result = result.slice(1);
     }
     if (result.endsWith('?')) {
-      result = result.substring(0, result.length - 1);
+      result = result.slice(0, -1);
     }
     return result;
   }
 }
+
+/**
+ * Check that a string is a valid API path, throwing if it is not.
+ * @param path - The path to check.
+ */
+export const validatePath = (path: string): void => {
+  new Path(path);
+};

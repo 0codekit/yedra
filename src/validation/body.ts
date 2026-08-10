@@ -31,6 +31,18 @@ export abstract class BodyType<Provides, Accepts> {
    * Generate OpenAPI docs for this body.
    */
   public abstract bodyDocs(): object;
+
+  /**
+   * Whether this body type can handle a request with the given content type.
+   *
+   * This is what `y.either` uses to pick an option. The choice has to be made
+   * up front rather than by trying each option in turn, because a request body
+   * is a stream that can only be read once. The default accepts anything.
+   * @param contentType - The request's content type.
+   */
+  public accepts(_contentType: string): boolean {
+    return true;
+  }
 }
 
 /**

@@ -7,7 +7,7 @@ test('Doc Schema', () => {
   expect(schema.documentation()).toStrictEqual({
     type: 'number',
     description: 'My Description.',
-    example: 3,
+    examples: [3],
   });
   expect(schema.parse(4)).toStrictEqual(4);
   expect(() => schema.parse('hello')).toThrow(

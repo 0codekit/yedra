@@ -1,6 +1,21 @@
 import { expect, test } from 'vitest';
 import { Path } from './path.js';
 
+test('Match Path Case Insensitively', () => {
+  // the path syntax allows upper case, so an upper-case segment has to match
+  // rather than silently matching nothing at all
+  const path = new Path('/Users/:id');
+  expect(path.match('/Users/3')).toStrictEqual({
+    params: { id: '3' },
+    score: 1,
+  });
+  expect(path.match('/users/3')).toStrictEqual({
+    params: { id: '3' },
+    score: 1,
+  });
+  expect(path.match('/other/3')).toBeUndefined();
+});
+
 test('Path Invalid', () => {
   expect(() => new Path('abc/test')).toThrow(
     `API path abc/test is invalid: Must start with '/'.`,

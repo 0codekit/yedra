@@ -1,12 +1,13 @@
 import type { Readable } from 'node:stream';
 import { paramDocs } from '../util/docs.js';
 import type { SecurityScheme } from '../util/security.js';
+import { BodySizeExceededError, limitBody } from '../util/stream.js';
 import type { BodyType, Typeof, TypeofAccepts } from '../validation/body.js';
 import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
 import { laxObject, type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
-import { BadRequestError } from './errors.js';
+import { BadRequestError, PayloadTooLargeError } from './errors.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
   url: string;
@@ -18,16 +19,24 @@ type ReqObject<Params, Query, Headers, Body> = {
   body: Body;
 };
 
+/**
+ * Headers on an outgoing response. Names are case-insensitive and are
+ * lowercased before being sent. A value of `undefined` means "do not set this
+ * header", and an array sets the header once per element — which is the only way
+ * to express more than one `Set-Cookie`.
+ */
+export type ResponseHeaders = Record<string, string | string[] | undefined>;
+
 type ResObject<Body> =
   | Promise<{
       status?: number;
       body: Body;
-      headers?: Record<string, string | undefined>;
+      headers?: ResponseHeaders;
     }>
   | {
       status?: number;
       body: Body;
-      headers?: Record<string, string | undefined>;
+      headers?: ResponseHeaders;
     };
 
 type EndpointOptions<
@@ -49,6 +58,11 @@ type EndpointOptions<
    * Default is false.
    */
   hidden?: boolean;
+  /**
+   * The largest request body this endpoint accepts, in bytes. Overrides the
+   * app-wide `maxBodySize`. Use `Number.POSITIVE_INFINITY` for no limit.
+   */
+  maxBodySize?: number;
   params: Params;
   query: Query;
   headers: Headers;
@@ -64,21 +78,37 @@ type EndpointOptions<
   ) => ResObject<TypeofAccepts<Res>>;
 };
 
+/** The body every error response carries, shared by each documented status. */
+const ERROR_BODY_DOCS = {
+  'application/json': {
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'number' },
+        errorMessage: { type: 'string' },
+        code: { type: 'string' },
+      },
+      required: ['status', 'errorMessage'],
+    },
+  },
+};
+
 export abstract class RestEndpoint {
-  abstract get method(): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  abstract handle(req: {
+  public abstract get method(): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  public abstract handle(req: {
     url: string;
     body: Readable;
     params: Record<string, string>;
     query: Record<string, string>;
     headers: Record<string, string>;
+    maxBodySize: number;
   }): Promise<{
     status?: number;
     body: unknown;
-    headers?: Record<string, string | undefined>;
+    headers?: ResponseHeaders;
   }>;
-  abstract isHidden(): boolean;
-  abstract documentation(
+  public abstract isHidden(): boolean;
+  public abstract documentation(
     path: string,
     securitySchemes: Set<SecurityScheme>,
   ): object;
@@ -96,11 +126,11 @@ class ConcreteRestEndpoint<
   Req extends BodyType<unknown, unknown>,
   Res extends BodyType<unknown, unknown>,
 > extends RestEndpoint {
-  private _method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
-  private options: EndpointOptions<Params, Query, Headers, Req, Res>;
-  private paramsSchema: ObjectSchema<Params>;
-  private querySchema: ObjectSchema<Query>;
-  private headersSchema: ObjectSchema<Headers>;
+  private readonly _method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  private readonly options: EndpointOptions<Params, Query, Headers, Req, Res>;
+  private readonly paramsSchema: ObjectSchema<Params>;
+  private readonly querySchema: ObjectSchema<Query>;
+  private readonly headersSchema: ObjectSchema<Headers>;
 
   public constructor(
     method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
@@ -126,24 +156,54 @@ class ConcreteRestEndpoint<
     params: Record<string, string>;
     query: Record<string, string>;
     headers: Record<string, string>;
+    maxBodySize: number;
   }): Promise<{
     status?: number;
     body: unknown;
-    headers?: Record<string, string | undefined>;
+    headers?: ResponseHeaders;
   }> {
-    let parsedBody: Typeof<Req>;
-    let parsedParams: Typeof<ObjectSchema<Params>>;
-    let parsedQuery: Typeof<ObjectSchema<Query>>;
-    let parsedHeaders: Typeof<ObjectSchema<Headers>>;
     const issues: Issue[] = [];
+    // Collect the issues from every part of the request rather than failing on
+    // the first, so that a caller sees everything that is wrong at once.
+    const collect = <T>(prefix: string, parse: () => T): T | undefined => {
+      try {
+        return parse();
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.withPrefix(prefix));
+          return;
+        }
+        throw error;
+      }
+    };
+
+    const maxBodySize = this.options.maxBodySize ?? req.maxBodySize;
+    // A truthful Content-Length lets an oversized body be rejected before any
+    // of it is read; `limitBody` still enforces the limit for chunked bodies
+    // and for clients that understate the length.
+    const declaredLength = Number(req.headers['content-length']);
+    if (Number.isFinite(declaredLength) && declaredLength > maxBodySize) {
+      throw new PayloadTooLargeError(
+        `Request body of ${declaredLength} bytes exceeds the maximum of ${maxBodySize} bytes.`,
+      );
+    }
+
+    let parsedBody: Typeof<Req> | undefined;
     try {
-      const result = await this.options.req.deserialize(
-        req.body,
+      parsedBody = await this.options.req.deserialize(
+        limitBody(req.body, maxBodySize),
         req.headers['content-type'] ?? 'application/octet-stream',
       );
-      parsedBody = result;
     } catch (error) {
+      if (error instanceof BodySizeExceededError) {
+        throw new PayloadTooLargeError(
+          `Request body exceeds the maximum of ${maxBodySize} bytes.`,
+          undefined,
+          { cause: error },
+        );
+      }
       if (error instanceof SyntaxError) {
+        // malformed JSON, reported as a body issue rather than a 500
         issues.push(new Issue(['body'], error.message));
       } else if (error instanceof ValidationError) {
         issues.push(...error.withPrefix('body'));
@@ -151,49 +211,28 @@ class ConcreteRestEndpoint<
         throw error;
       }
     }
-    try {
-      parsedParams = this.paramsSchema.parse(req.params);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        issues.push(...error.withPrefix('params'));
-      } else {
-        throw error;
-      }
-    }
-    try {
-      parsedQuery = this.querySchema.parse(req.query);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        issues.push(...error.withPrefix('query'));
-      } else {
-        throw error;
-      }
-    }
-    try {
-      parsedHeaders = this.headersSchema.parse(req.headers);
-    } catch (error) {
-      if (error instanceof ValidationError) {
-        issues.push(...error.withPrefix('headers'));
-      } else {
-        throw error;
-      }
-    }
+    const parsedParams = collect('params', () =>
+      this.paramsSchema.parse(req.params),
+    );
+    const parsedQuery = collect('query', () =>
+      this.querySchema.parse(req.query),
+    );
+    const parsedHeaders = collect('headers', () =>
+      this.headersSchema.parse(req.headers),
+    );
     if (issues.length > 0) {
-      const error = new ValidationError(issues);
-      throw new BadRequestError(error.format());
+      throw new BadRequestError(new ValidationError(issues).format());
     }
+    // Reaching here means nothing pushed an issue, so every part above parsed
+    // successfully. `body` is genuinely undefined for endpoints without one.
     return await this.options.do({
       url: req.url,
       method: this._method,
-      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
-      params: parsedParams!,
-      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
-      query: parsedQuery!,
-      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
-      headers: parsedHeaders!,
+      params: parsedParams as Typeof<ObjectSchema<Params>>,
+      query: parsedQuery as Typeof<ObjectSchema<Query>>,
+      headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
       rawHeaders: req.headers,
-      // biome-ignore lint/style/noNonNullAssertion: this is required to convince TypeScript that this is initialized
-      body: parsedBody!,
+      body: parsedBody as Typeof<Req>,
     });
   }
 
@@ -219,8 +258,13 @@ class ConcreteRestEndpoint<
       tags: [this.options.category],
       summary: this.options.summary,
       description: this.options.description,
-      operationId: `${path.substring(1).replaceAll('/', '_')}_${this.method.toLowerCase()}`,
-      security: security.map((security) => ({ [security.name]: [] })),
+      // Generators turn operationId into a function name, so the braces of a
+      // path parameter have to go.
+      operationId: `${path
+        .slice(1)
+        .replaceAll('/', '_')
+        .replaceAll(/[{}]/g, '')}_${this.method.toLowerCase()}`,
+      security: security.map((scheme) => ({ [scheme.name]: [] })),
       parameters,
       requestBody:
         this.options.req instanceof NoneBody
@@ -236,26 +280,18 @@ class ConcreteRestEndpoint<
         },
         '400': {
           description: 'Bad Request',
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  status: {
-                    type: 'number',
-                  },
-                  errorMessage: {
-                    type: 'string',
-                  },
-                  code: {
-                    type: 'string',
-                  },
-                },
-                required: ['status', 'errorMessage'],
-              },
-            },
-          },
+          content: ERROR_BODY_DOCS,
         },
+        // Every endpoint that reads a body enforces `maxBodySize`, so a 413 is
+        // as much a part of its contract as a 400.
+        ...(this.options.req instanceof NoneBody
+          ? undefined
+          : {
+              '413': {
+                description: 'Content Too Large',
+                content: ERROR_BODY_DOCS,
+              },
+            }),
       },
     };
   }

@@ -1,73 +1,55 @@
 import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
+import { parseNumeric } from './numeric.js';
 
 class IntegerSchema extends ModifiableSchema<number> {
-  private readonly minValue?: number;
-  private readonly maxValue?: number;
-
-  public constructor(min?: number, max?: number) {
-    super();
-    this.minValue = min;
-    this.maxValue = max;
-  }
-
   /**
-   * Set the minimum value the number is allowed to be.
+   * Set the minimum value the integer is allowed to be.
    * @param value - The minimum value.
    */
-  public min(value: number): IntegerSchema {
+  public min(value: number): this {
     if (!Number.isInteger(value)) {
       throw new Error('minimum value has to be an integer');
     }
-    return new IntegerSchema(value, this.maxValue);
+    return this.refine(
+      (num) => num >= value || `Must be at least ${value}, but was ${num}`,
+      { minimum: value },
+    );
   }
 
   /**
-   * Set the maximum value the number is allowed to be.
+   * Set the maximum value the integer is allowed to be.
    * @param value - The maximum value.
    */
-  public max(value: number): IntegerSchema {
+  public max(value: number): this {
     if (!Number.isInteger(value)) {
       throw new Error('maximum value has to be an integer');
     }
-    return new IntegerSchema(this.minValue, value);
+    return this.refine(
+      (num) => num <= value || `Must be at most ${value}, but was ${num}`,
+      { maximum: value },
+    );
   }
 
-  public override parse(obj: unknown): number {
-    if (typeof obj !== 'number' && typeof obj !== 'string') {
-      throw new ValidationError([
-        new Issue([], `Expected number but got ${typeof obj}`),
-      ]);
-    }
-    const num = typeof obj === 'number' ? obj : Number.parseFloat(obj);
-    if (Number.isNaN(num) || !Number.isInteger(num)) {
+  protected override parseValue(obj: unknown): number {
+    const num = parseNumeric(obj, 'integer');
+    if (!Number.isInteger(num)) {
       throw new ValidationError([
         new Issue([], `Expected integer but got ${typeof obj}`),
-      ]);
-    }
-    if (this.minValue !== undefined && num < this.minValue) {
-      throw new ValidationError([
-        new Issue([], `Must be at least ${this.minValue}, but was ${num}`),
-      ]);
-    }
-    if (this.maxValue !== undefined && num > this.maxValue) {
-      throw new ValidationError([
-        new Issue([], `Must be at most ${this.maxValue}, but was ${num}`),
       ]);
     }
     return num;
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       type: 'integer',
-      ...(this.minValue !== undefined && { minimum: this.minValue }),
-      ...(this.maxValue !== undefined && { maximum: this.maxValue }),
     };
   }
 }
 
 /**
- * A schema that matches an integer.
+ * A schema that matches an integer. Integral strings such as `'42'` are
+ * accepted and coerced, since query parameters and headers are always strings.
  */
 export const integer = (): IntegerSchema => new IntegerSchema();

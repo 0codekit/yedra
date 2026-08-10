@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { Yedra } from '../routing/app.js';
 import { Get } from '../routing/rest.js';
-import { type LazySchema, collectLazySchemas, lazy } from './lazy.js';
+import { collectLazySchemas, type LazySchema, lazy } from './lazy.js';
 import { number } from './number.js';
 import { object } from './object.js';
 import { string } from './string.js';
@@ -40,7 +40,7 @@ test('Lazy schema supports recursive types', () => {
 
   expect(result.name).toBe('root');
   expect(result.subcategories).toHaveLength(2);
-  expect(result.subcategories[1].subcategories[0].name).toBe('grandchild');
+  expect(result.subcategories[1]?.subcategories[0]?.name).toBe('grandchild');
   expect(category.isOptional()).toBe(false);
 });
 
@@ -139,10 +139,10 @@ test('Lazy schema appears in OpenAPI components/schemas', async () => {
     }),
   );
 
-  const context = await app.listen(27570, { quiet: true });
-  const response = await fetch('http://localhost:27570/openapi.json');
+  const context = await app.listen(0, { quiet: true });
+  const response = await fetch(`http://localhost:${context.port}/openapi.json`);
   expect(await response.json()).toStrictEqual({
-    openapi: '3.0.2',
+    openapi: '3.1.1',
     info: {
       title: 'Yedra API',
       description:
@@ -227,4 +227,37 @@ test('Lazy schema supports chainable methods', () => {
     value: 1,
     children: [],
   });
+});
+
+test('Two Lazy Schemas Cannot Share A Name', () => {
+  interface A {
+    kind: string;
+  }
+  interface B {
+    other: number;
+  }
+  const first: LazySchema<A> = lazy('Shared', () => object({ kind: string() }));
+  const second: LazySchema<B> = lazy('Shared', () =>
+    object({ other: number() }),
+  );
+  // both would render as `$ref: '#/components/schemas/Shared'`, so one of the
+  // two would silently be documented with the other's shape
+  expect(() =>
+    collectLazySchemas(() => {
+      first.documentation();
+      second.documentation();
+    }),
+  ).toThrow('Duplicate lazy schema name `Shared`');
+});
+
+test('The Same Lazy Schema May Appear Many Times', () => {
+  interface A {
+    kind: string;
+  }
+  const only: LazySchema<A> = lazy('Reused', () => object({ kind: string() }));
+  const { schemas } = collectLazySchemas(() => {
+    only.documentation();
+    only.documentation();
+  });
+  expect([...schemas.keys()]).toStrictEqual(['Reused']);
 });

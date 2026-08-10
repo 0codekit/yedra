@@ -34,12 +34,12 @@ const app = new Yedra().use(
 );
 
 test('Security Scheme Docs', async () => {
-  const context = await app.listen(27561, {
+  const context = await app.listen(0, {
     quiet: true,
   });
-  const response = await fetch('http://localhost:27561/openapi.json');
+  const response = await fetch(`http://localhost:${context.port}/openapi.json`);
   expect(await response.json()).toStrictEqual({
-    openapi: '3.0.2',
+    openapi: '3.1.1',
     info: {
       title: 'Yedra API',
       description:

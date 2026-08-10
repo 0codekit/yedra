@@ -1,25 +1,12 @@
-import { Path } from './routing/path.js';
+// The `y` namespace. Everything here describes data, and appears in a schema
+// or in an endpoint's `req`/`res`/`params`/`query`/`headers` position.
+//
+// Everything used to *build a server* — the app, the endpoint classes, the
+// HTTP errors, `parseEnv` — is exported from the package root instead.
 
-// routing
-export {
-  BadRequestError,
-  ConflictError,
-  ForbiddenError,
-  HttpError,
-  NotFoundError,
-  PaymentRequiredError,
-  UnauthorizedError,
-} from './routing/errors.js';
-export { Log } from './routing/log.js';
-// validation (browser-safe, shared with yedra/schema)
+// Schemas. Browser-safe, and shared verbatim with the `yedra/schema` entry.
 export * from './schema-lib.js';
-export const validatePath = (path: string) => {
-  new Path(path);
-};
-export { parseEnv } from './routing/env.js';
-export { SecurityScheme } from './util/security.js';
-
-// Node-only body types
+// Body types. Server-only: each one reads a request stream.
 export { either } from './validation/either.js';
 export { json } from './validation/json.js';
 export { raw } from './validation/raw.js';

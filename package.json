@@ -1,8 +1,9 @@
 {
 	"name": "yedra",
-	"version": "0.20.14",
+	"version": "0.21.0",
 	"repository": "github:0codekit/yedra",
 	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
 	"exports": {
 		".": {
 			"types": "./dist/index.d.ts",
@@ -13,12 +14,13 @@
 			"default": "./dist/schema.js"
 		}
 	},
+	"sideEffects": false,
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.3",
-		"@types/node": "^26.1.1",
+		"@biomejs/biome": "^2.5.7",
+		"@types/node": "^26.2.0",
 		"@types/ws": "^8.18.1",
 		"typescript": "^7.0.2",
-		"vitest": "^3.2.4"
+		"vitest": "^4.1.10"
 	},
 	"bugs": "https://github.com/0codekit/yedra/issues",
 	"contributors": [
@@ -31,24 +33,31 @@
 		"http",
 		"schema",
 		"validation",
-		"openapi"
+		"openapi",
+		"standard-schema"
 	],
 	"license": "MIT",
 	"files": [
-		"./dist/**"
+		"./dist/**",
+		"CHANGELOG.md"
 	],
+	"engines": {
+		"node": ">=22.15"
+	},
 	"packageManager": "pnpm@11.3.0",
 	"scripts": {
-		"check": "biome check src/*",
-		"test": "vitest run"
+		"build": "tsc -p tsconfig.build.json",
+		"check": "biome check src",
+		"format": "biome check --write src",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"prepublishOnly": "pnpm run check && pnpm run typecheck && pnpm run test && pnpm run build"
 	},
-	"types": "dist/index.d.ts",
 	"type": "module",
 	"dependencies": {
 		"@opentelemetry/api": "^1.9.1",
 		"@standard-schema/spec": "^1.1.0",
 		"mime": "^4.1.0",
-		"uuid": "^14.0.1",
-		"ws": "^8.21.0"
+		"ws": "^8.21.3"
 	}
 }

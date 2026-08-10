@@ -8,7 +8,7 @@ class StringSchema extends ModifiableSchema<string> {
    * Set the minimum length the string is allowed to be.
    * @param length - The minimum length.
    */
-  public min(length: number) {
+  public min(length: number): this {
     return this.refine(
       (s) => s.length >= length || `Must be at least ${length} characters`,
       { minLength: length },
@@ -19,7 +19,7 @@ class StringSchema extends ModifiableSchema<string> {
    * Set the maximum length the string is allowed to be.
    * @param length - The maximum length.
    */
-  public max(length: number) {
+  public max(length: number): this {
     return this.refine(
       (s) => s.length <= length || `Must be at most ${length} characters`,
       { maxLength: length },
@@ -27,9 +27,18 @@ class StringSchema extends ModifiableSchema<string> {
   }
 
   /**
+   * Set the exact length the string has to be. Equivalent to calling both
+   * `min` and `max`.
+   * @param length - The length.
+   */
+  public length(length: number): this {
+    return this.min(length).max(length);
+  }
+
+  /**
    * Require the string to be a valid email address.
    */
-  public email() {
+  public email(): this {
     return this.refine((s) => EMAIL_REGEX.test(s) || 'Expected email address', {
       format: 'email',
     });
@@ -39,14 +48,14 @@ class StringSchema extends ModifiableSchema<string> {
    * Require the string to match the specified pattern.
    * @param pattern - A regular expression.
    */
-  public pattern(pattern: RegExp) {
+  public pattern(pattern: RegExp): this {
     return this.refine(
       (s) => pattern.test(s) || `Does not match pattern /${pattern.source}/`,
       { pattern: pattern.source },
     );
   }
 
-  public override parse(obj: unknown): string {
+  protected override parseValue(obj: unknown): string {
     if (typeof obj !== 'string') {
       throw new ValidationError([
         new Issue([], `Expected string but got ${typeof obj}`),
@@ -55,7 +64,7 @@ class StringSchema extends ModifiableSchema<string> {
     return obj;
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       type: 'string',
     };

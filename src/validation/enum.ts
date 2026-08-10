@@ -1,9 +1,9 @@
-import { Issue, ValidationError } from './error.js';
+import { Issue, truncate, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 
-class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
-  T[number]
-> {
+export class EnumSchema<
+  T extends [...(string | number)[]],
+> extends ModifiableSchema<T[number]> {
   private readonly options: T;
   private readonly normalized: string[];
 
@@ -13,7 +13,12 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
     this.normalized = options.map((option) => option.toString());
   }
 
-  public parse(obj: unknown): T[number] {
+  /** The values this schema accepts. */
+  public get values(): readonly (string | number)[] {
+    return this.options;
+  }
+
+  protected override parseValue(obj: unknown): T[number] {
     if (typeof obj !== 'string' && typeof obj !== 'number') {
       // enum objects can only be strings or numbers
       throw new ValidationError([
@@ -24,24 +29,28 @@ class EnumSchema<T extends [...(string | number)[]]> extends ModifiableSchema<
       ]);
     }
     // compare only the stringified (normalized) values
-    const normalizedObj = obj.toString();
-    const index = this.normalized.indexOf(normalizedObj);
+    const index = this.normalized.indexOf(obj.toString());
     if (index === -1) {
-      // invalid value
+      // invalid value. Truncated, because it is the request's own bytes being
+      // quoted back and a rejected string can be as large as the body limit.
       throw new ValidationError([
         new Issue(
           [],
-          `Expected one of ${this.options.join(', ')} but got ${obj}`,
+          `Expected one of ${this.options.join(', ')} but got ${truncate(obj.toString(), 60)}`,
         ),
       ]);
     }
-    // return the un-normalized value
-    return this.options[index];
+    // return the un-normalized value. `index` came from `indexOf` on an array
+    // built from `options`, so it is always in range.
+    return this.options[index] as T[number];
   }
 
-  public documentation(): object {
+  protected override baseDocumentation(): object {
+    // A purely numeric enum should not be documented as a string. Mixed enums
+    // stay `string`, since every option round-trips through its string form.
+    const numeric = this.options.every((option) => typeof option === 'number');
     return {
-      type: 'string',
+      type: numeric ? 'number' : 'string',
       enum: this.options,
     };
   }

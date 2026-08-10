@@ -19,9 +19,9 @@ test('WebSocket', async () => {
         headers: {
           cookie: string().optional(),
         },
-        do(ws, req) {
-          ws.onmessage = (data) => {
-            ws.send(
+        do(socket, req) {
+          socket.on('message', (data) => {
+            socket.send(
               JSON.stringify({
                 url: '/ws',
                 id: req.params.id,
@@ -30,16 +30,19 @@ test('WebSocket', async () => {
                 message: data.toString('utf-8'),
               }),
             );
-          };
+          });
         },
       }),
     )
-    .listen(27539, { quiet: true });
-  const ws = new WebSocket('http://localhost:27539/ws/test?hello=world', {
-    headers: {
-      Cookie: 'session=abc123',
+    .listen(0, { quiet: true });
+  const ws = new WebSocket(
+    `http://localhost:${context.port}/ws/test?hello=world`,
+    {
+      headers: {
+        Cookie: 'session=abc123',
+      },
     },
-  });
+  );
   // wait for WebSocket to open
   await new Promise((resolve) => {
     ws.onopen = resolve;
@@ -56,14 +59,13 @@ test('WebSocket', async () => {
     cookie: 'session=abc123',
     message: 'this is a message',
   });
-  await context.stop();
-  // wait for close event
-  const { code, reason } = await new Promise<{
-    code: number;
-    reason: string;
-  }>((resolve) => {
+  // Registered before stopping, because `stop` waits for connections to close:
+  // by the time it resolves this event has already fired.
+  const closed = new Promise<{ code: number; reason: string }>((resolve) => {
     ws.onclose = (e) => resolve({ code: e.code, reason: e.reason });
   });
+  await context.stop();
+  const { code, reason } = await closed;
   expect(code).toBe(1000);
   expect(reason).toBe('Server Shutdown');
 });

@@ -1,19 +1,37 @@
 import type { Typeof } from './body.js';
-import { DocSchema } from './doc.js';
 import { Issue, ValidationError } from './error.js';
 import { Schema } from './schema.js';
 
+/**
+ * A schema that can be wrapped by the modifiers below. Modifiers that change
+ * the parsed type (`optional`, `nullable`, `default`, `array`) produce a new
+ * wrapper schema and therefore live here; modifiers that preserve the type
+ * (`refine`, `describe`) live on `Schema` itself and return `this`.
+ */
 export abstract class ModifiableSchema<T> extends Schema<T> {
   /**
-   * Mark this schema as optional.
+   * Mark this schema as optional, allowing the value to be `undefined`. In an
+   * object schema, the key may then be missing entirely.
    */
   public optional(): OptionalSchema<T> {
     return new OptionalSchema(this);
   }
 
   /**
-   * Provide a default value. If the input is undefined or null, the default
-   * value is returned instead.
+   * Allow the value to be `null` in addition to whatever this schema accepts.
+   *
+   * ```typescript
+   * const schema = y.object({ nickname: y.string().nullable() });
+   * type SchemaType = y.Typeof<typeof schema>; // { nickname: string | null }
+   * ```
+   */
+  public nullable(): NullableSchema<T> {
+    return new NullableSchema(this);
+  }
+
+  /**
+   * Provide a default value, used when the input is `undefined`. `null` is not
+   * replaced by the default — use `nullable` to allow it explicitly.
    * @param value - The default value.
    */
   public default(value: T): DefaultSchema<T> {
@@ -21,63 +39,29 @@ export abstract class ModifiableSchema<T> extends Schema<T> {
   }
 
   /**
-   * Add a custom validation predicate. The inner schema is parsed first,
-   * then the predicate is checked against the parsed value.
-   * @param fn - A predicate that returns true if the value is valid, or a
-   *   string error message if it is not.
+   * A schema matching an array whose items match this schema.
    */
-  public refine(
-    fn: (value: T) => boolean | string,
-    docs?: Record<string, unknown>,
-  ): RefinedSchema<T> {
-    return new RefinedSchema(this, fn, docs);
-  }
-
-  public describe(description: string, example?: T): DocSchema<T> {
-    return new DocSchema(this, description, example);
-  }
-
   public array(): ArraySchema<Schema<T>> {
     return new ArraySchema(this as Schema<T>);
   }
 }
 
-class OptionalSchema<T> extends Schema<T | undefined> {
-  private schema: Schema<T>;
+class OptionalSchema<T> extends ModifiableSchema<T | undefined> {
+  private readonly schema: Schema<T>;
 
   public constructor(schema: Schema<T>) {
     super();
     this.schema = schema;
   }
 
-  /**
-   * Add a description and example to the schema.
-   * @param doc - The documentation.
-   * @deprecated - Use .describe() instead.
-   */
-  public doc(doc: {
-    description: string;
-    example?: T;
-  }): DocSchema<T | undefined> {
-    return new DocSchema(this, doc.description, doc.example);
-  }
-
-  public describe(description: string, example?: T): DocSchema<T | undefined> {
-    return new DocSchema(this, description, example);
-  }
-
-  public array(): ArraySchema<Schema<T | undefined>> {
-    return new ArraySchema(this as Schema<T | undefined>);
-  }
-
-  public override parse(obj: unknown): T | undefined {
+  protected override parseValue(obj: unknown): T | undefined {
     if (obj === undefined) {
-      return undefined;
+      return;
     }
     return this.schema.parse(obj);
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return this.schema.documentation();
   }
 
@@ -86,7 +70,46 @@ class OptionalSchema<T> extends Schema<T | undefined> {
   }
 }
 
-class DefaultSchema<T> extends Schema<T> {
+class NullableSchema<T> extends ModifiableSchema<T | null> {
+  private readonly schema: Schema<T>;
+
+  public constructor(schema: Schema<T>) {
+    super();
+    this.schema = schema;
+  }
+
+  protected override parseValue(obj: unknown): T | null {
+    if (obj === null) {
+      return null;
+    }
+    return this.schema.parse(obj);
+  }
+
+  protected override baseDocumentation(): object {
+    const inner = this.schema.documentation();
+    // JSON Schema, which OpenAPI 3.1 uses, spells nullability as a union of
+    // types. That only works where there is a plain `type` to extend: a `$ref`
+    // or a composed schema has to be wrapped in `anyOf` instead, since sibling
+    // keywords beside a `$ref` were ignored before 3.1 and are widely still
+    // treated that way by tooling.
+    const { type } = inner as { type?: unknown };
+    if (typeof type === 'string') {
+      return { ...inner, type: [type, 'null'] };
+    }
+    if (Array.isArray(type)) {
+      return type.includes('null')
+        ? inner
+        : { ...inner, type: [...type, 'null'] };
+    }
+    return { anyOf: [inner, { type: 'null' }] };
+  }
+
+  public override isOptional(): boolean {
+    return this.schema.isOptional();
+  }
+}
+
+class DefaultSchema<T> extends ModifiableSchema<T> {
   private readonly schema: Schema<T>;
   private readonly defaultValue: T;
 
@@ -96,22 +119,14 @@ class DefaultSchema<T> extends Schema<T> {
     this.defaultValue = defaultValue;
   }
 
-  public describe(description: string, example?: T): DocSchema<T> {
-    return new DocSchema(this, description, example);
-  }
-
-  public array(): ArraySchema<Schema<T>> {
-    return new ArraySchema(this as Schema<T>);
-  }
-
-  public override parse(obj: unknown): T {
-    if (obj === undefined || obj === null) {
+  protected override parseValue(obj: unknown): T {
+    if (obj === undefined) {
       return this.defaultValue;
     }
     return this.schema.parse(obj);
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       ...this.schema.documentation(),
       default: this.defaultValue,
@@ -120,94 +135,6 @@ class DefaultSchema<T> extends Schema<T> {
 
   public override isOptional(): boolean {
     return true;
-  }
-}
-
-export class RefinedSchema<T> extends ModifiableSchema<T> {
-  private readonly schema: Schema<T>;
-  private readonly predicate: (value: T) => boolean | string;
-  private readonly docs?: Record<string, unknown>;
-
-  public constructor(
-    schema: Schema<T>,
-    predicate: (value: T) => boolean | string,
-    docs?: Record<string, unknown>,
-  ) {
-    super();
-    this.schema = schema;
-    this.predicate = predicate;
-    this.docs = docs;
-  }
-
-  /**
-   * Set the minimum length/items for strings and arrays.
-   * @param value - The minimum constraint.
-   */
-  public min(value: number): RefinedSchema<T> {
-    const docs = this.documentation() as Record<string, unknown>;
-    const isArray = docs.type === 'array';
-    return this.refine(
-      ((v: T) => {
-        const len = (v as string | unknown[]).length;
-        return (
-          len >= value ||
-          (isArray
-            ? `Must have at least ${value} items`
-            : `Must be at least ${value} characters`)
-        );
-      }) as (value: T) => boolean | string,
-      isArray ? { minItems: value } : { minLength: value },
-    );
-  }
-
-  /**
-   * Set the maximum length/items for strings and arrays.
-   * @param value - The maximum constraint.
-   */
-  public max(value: number): RefinedSchema<T> {
-    const docs = this.documentation() as Record<string, unknown>;
-    const isArray = docs.type === 'array';
-    return this.refine(
-      ((v: T) => {
-        const len = (v as string | unknown[]).length;
-        return (
-          len <= value ||
-          (isArray
-            ? `Must have at most ${value} items`
-            : `Must be at most ${value} characters`)
-        );
-      }) as (value: T) => boolean | string,
-      isArray ? { maxItems: value } : { maxLength: value },
-    );
-  }
-
-  /**
-   * Set the exact length/items for strings and arrays.
-   * @param value - The exact constraint.
-   */
-  public length(value: number): RefinedSchema<T> {
-    return this.min(value).max(value);
-  }
-
-  public override parse(obj: unknown): T {
-    const parsed = this.schema.parse(obj);
-    const result = this.predicate(parsed);
-    if (result === true) {
-      return parsed;
-    }
-    const message = typeof result === 'string' ? result : 'Validation failed';
-    throw new ValidationError([new Issue([], message)]);
-  }
-
-  public override documentation(): object {
-    return {
-      ...this.schema.documentation(),
-      ...this.docs,
-    };
-  }
-
-  public override isOptional(): boolean {
-    return this.schema.isOptional();
   }
 }
 
@@ -222,40 +149,36 @@ export class ArraySchema<
   }
 
   /**
-   * Set the minimum number of items for arrays.
+   * Set the minimum number of items.
    * @param items - The minimum number of items.
    */
-  public min(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
+  public min(items: number): this {
     return this.refine(
-      (arr) => arr.length >= items || `Must have at least ${items} items`,
+      (array) => array.length >= items || `Must have at least ${items} items`,
       { minItems: items },
     );
   }
 
   /**
-   * Set the maximum number of items for arrays.
+   * Set the maximum number of items.
    * @param items - The maximum number of items.
    */
-  public max(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
+  public max(items: number): this {
     return this.refine(
-      (arr) => arr.length <= items || `Must have at most ${items} items`,
+      (array) => array.length <= items || `Must have at most ${items} items`,
       { maxItems: items },
     );
   }
 
   /**
-   * Set the exact number of items for arrays.
-   * This is equivalent to calling both min and max.
+   * Set the exact number of items. Equivalent to calling both `min` and `max`.
    * @param items - The number of items.
    */
-  public length(items: number): RefinedSchema<Typeof<ItemSchema>[]> {
-    return this.min(items).refine(
-      (arr) => arr.length <= items || `Must have at most ${items} items`,
-      { maxItems: items },
-    );
+  public length(items: number): this {
+    return this.min(items).max(items);
   }
 
-  public parse(obj: unknown): Typeof<ItemSchema>[] {
+  protected override parseValue(obj: unknown): Typeof<ItemSchema>[] {
     if (!Array.isArray(obj)) {
       throw new ValidationError([
         new Issue([], `Expected array but got ${typeof obj}`),
@@ -265,10 +188,10 @@ export class ArraySchema<
     const issues: Issue[] = [];
     for (let i = 0; i < obj.length; ++i) {
       try {
-        elems.push(this.itemSchema.parse(obj[i]));
+        elems.push(this.itemSchema.parse(obj[i]) as Typeof<ItemSchema>);
       } catch (error) {
         if (error instanceof ValidationError) {
-          issues.push(...error.withPrefix(i.toString()));
+          issues.push(...error.withPrefix(i));
         } else {
           throw error;
         }
@@ -280,19 +203,10 @@ export class ArraySchema<
     return elems;
   }
 
-  public documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       type: 'array',
       items: this.itemSchema.documentation(),
     };
   }
 }
-
-/**
- * A schema matching arrays of the provided item type.
- * @param itemSchema - The schema for array items.
- * @deprecated Use the .array() method instead.
- */
-export const array = <ItemSchema extends Schema<unknown>>(
-  itemSchema: ItemSchema,
-): ArraySchema<ItemSchema> => new ArraySchema(itemSchema);

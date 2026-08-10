@@ -5,16 +5,20 @@
 export { BodyType, type Typeof } from './validation/body.js';
 export { boolean } from './validation/boolean.js';
 export { date } from './validation/date.js';
+export { discriminatedUnion } from './validation/discriminated-union.js';
 export { _enum as enum } from './validation/enum.js';
-export { ValidationError } from './validation/error.js';
+export {
+  Issue,
+  type PathSegment,
+  ValidationError,
+} from './validation/error.js';
 export { integer } from './validation/integer.js';
-export { lazy, LazySchema } from './validation/lazy.js';
-export { array } from './validation/modifiable.js';
+export { LazySchema, lazy } from './validation/lazy.js';
 export { _null as null } from './validation/null.js';
 export { number } from './validation/number.js';
 export { laxObject, object } from './validation/object.js';
 export { record } from './validation/record.js';
-export { Schema } from './validation/schema.js';
+export { type Refinement, Schema } from './validation/schema.js';
 export { string } from './validation/string.js';
 export { union } from './validation/union.js';
 export { unknown } from './validation/unknown.js';

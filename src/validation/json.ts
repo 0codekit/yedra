@@ -1,16 +1,17 @@
 import type { Readable } from 'node:stream';
 import { readableToBuffer } from '../util/stream.js';
 import { BodyType } from './body.js';
+import { mediaType } from './content-type.js';
 import { Issue, ValidationError } from './error.js';
 import type { Schema } from './schema.js';
 
 class JsonBody<T> extends BodyType<T, T> {
-  private contentType: string;
-  private schema: Schema<T>;
+  private readonly contentType: string;
+  private readonly schema: Schema<T>;
 
   public constructor(contentType: string, schema: Schema<T>) {
     super();
-    this.contentType = contentType;
+    this.contentType = mediaType(contentType);
     this.schema = schema;
   }
 
@@ -19,16 +20,19 @@ class JsonBody<T> extends BodyType<T, T> {
     if (buffer.length === 0) {
       return this.schema.parse({});
     }
-    if (contentType !== this.contentType) {
+    if (!this.accepts(contentType)) {
       throw new ValidationError([
         new Issue(
           [],
-          `Expected content type \`${this.contentType}\`, but got \`${contentType}\``,
+          `Expected content type \`${this.contentType}\`, but got \`${mediaType(contentType)}\``,
         ),
       ]);
     }
-    const obj = JSON.parse(buffer.toString('utf-8'));
-    return this.schema.parse(obj);
+    return this.schema.parse(JSON.parse(buffer.toString('utf-8')));
+  }
+
+  public override accepts(contentType: string): boolean {
+    return mediaType(contentType) === this.contentType;
   }
 
   public bodyDocs(): object {
@@ -40,9 +44,10 @@ class JsonBody<T> extends BodyType<T, T> {
   }
 }
 
-export const json = <T>(
-  schema: Schema<T>,
-  contentType: string,
-): JsonBody<T> => {
-  return new JsonBody(contentType, schema);
-};
+/**
+ * A JSON body served under a content type other than `application/json`.
+ * @param schema - The schema the parsed JSON has to match.
+ * @param contentType - The content type to accept.
+ */
+export const json = <T>(schema: Schema<T>, contentType: string): JsonBody<T> =>
+  new JsonBody(contentType, schema);

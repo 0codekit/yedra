@@ -1,57 +1,95 @@
 import type { URL } from 'node:url';
 import type { WebSocket as NodeWebSocket } from 'ws';
-import { paramDocs } from '../util/docs.js';
 import type { Typeof } from '../validation/body.js';
 import { ValidationError } from '../validation/error.js';
 import { laxObject, type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
 import { BadRequestError } from './errors.js';
 
-type MessageCb = (message: Buffer) => Promise<void> | void;
-type CloseCb = (
-  code: number | undefined,
-  reason: string | undefined,
+/**
+ * The events a WebSocket handler can subscribe to, and what each one passes.
+ */
+type WebSocketEvents = {
+  message: [message: Buffer];
+  close: [code: number | undefined, reason: string | undefined];
+  error: [error: Error];
+};
+
+type Handler<Event extends keyof WebSocketEvents> = (
+  ...args: WebSocketEvents[Event]
 ) => Promise<void> | void;
 
 class YedraWebSocket {
-  private ws: NodeWebSocket;
+  private readonly ws: NodeWebSocket;
 
   private messageQueue: Buffer[] = [];
 
-  private messageHandlers: MessageCb[] = [];
-  private closeHandlers: CloseCb[] = [];
+  private readonly handlers: {
+    [Event in keyof WebSocketEvents]: Handler<Event>[];
+  } = { message: [], close: [], error: [] };
 
   public constructor(ws: NodeWebSocket) {
     this.ws = ws;
     ws.on('message', (data: Buffer) => {
-      for (const cb of this.messageHandlers) {
-        cb(data);
-      }
-      if (this.messageHandlers.length === 0) {
-        // there are no message handlers registered yet,
-        // add the message to the queue
+      if (this.handlers.message.length === 0) {
+        // no message handler has been registered yet, so hold on to the message
+        // until one is
         this.messageQueue.push(data);
+        return;
       }
+      this.emit('message', data);
     });
-    ws.on('close', (code: number, reason: string) => {
-      for (const cb of this.closeHandlers) {
-        cb(code, reason);
-      }
+    ws.on('close', (code: number, reason: Buffer) => {
+      // `ws` emits the close reason as a Buffer, not a string.
+      this.emit('close', code, reason.toString('utf-8'));
+    });
+    ws.on('error', (error: Error) => {
+      this.emit('error', error);
     });
   }
 
-  public set onmessage(cb: MessageCb) {
-    this.messageHandlers.push(cb);
-    // if there are queued messages, process them now
-    const messages = this.messageQueue;
+  /**
+   * Register a handler for one of the socket's events. Handlers accumulate:
+   * registering a second one for the same event does not replace the first, and
+   * they run in the order they were added.
+   *
+   * Messages that arrive before the first `message` handler is registered are
+   * queued and delivered to it, so a handler set up after an `await` does not
+   * miss them.
+   *
+   * An `error` handler sees connection failures — a protocol violation, or a
+   * message larger than the configured `maxPayload`. The socket is closing by
+   * the time it fires, so `close` follows.
+   * @param event - The event to listen for.
+   * @param handler - The handler to add.
+   */
+  public on<Event extends keyof WebSocketEvents>(
+    event: Event,
+    handler: Handler<Event>,
+  ): void {
+    this.handlers[event].push(handler);
+    if (event !== 'message' || this.messageQueue.length === 0) {
+      return;
+    }
+    const queued = this.messageQueue;
     this.messageQueue = [];
-    for (const message of messages) {
-      cb(message);
+    for (const message of queued) {
+      this.emit('message', message);
     }
   }
 
-  public set onclose(cb: CloseCb) {
-    this.closeHandlers.push(cb);
+  private emit<Event extends keyof WebSocketEvents>(
+    event: Event,
+    ...args: WebSocketEvents[Event]
+  ): void {
+    for (const handler of this.handlers[event]) {
+      // A handler may be async, and nothing awaits it. Report a rejection
+      // rather than letting it become an unhandled rejection that takes the
+      // process down.
+      void (async () => handler(...args))().catch((error: unknown) =>
+        console.error(error),
+      );
+    }
   }
 
   /**
@@ -103,8 +141,15 @@ type WebSocketOptions<
   ) => Promise<void> | void;
 };
 
+/**
+ * WebSocket endpoints are deliberately absent from the generated OpenAPI
+ * document. OpenAPI 3.0 has no way to describe a WebSocket, and the nearest
+ * approximation — a `get` operation answering `101` — is indistinguishable
+ * from a real GET, which this server answers with a 404. AsyncAPI is the
+ * standard that covers this.
+ */
 export abstract class WsEndpoint {
-  abstract handle(
+  public abstract handle(
     url: URL,
     params: Record<string, string>,
     headers: Record<string, string>,
@@ -117,10 +162,10 @@ export class Ws<
   Query extends Record<string, Schema<unknown>>,
   Headers extends Record<string, Schema<unknown>>,
 > extends WsEndpoint {
-  private options: WebSocketOptions<Params, Query, Headers>;
-  private paramsSchema: ObjectSchema<Params>;
-  private querySchema: ObjectSchema<Query>;
-  private headersSchema: ObjectSchema<Headers>;
+  private readonly options: WebSocketOptions<Params, Query, Headers>;
+  private readonly paramsSchema: ObjectSchema<Params>;
+  private readonly querySchema: ObjectSchema<Query>;
+  private readonly headersSchema: ObjectSchema<Headers>;
 
   public constructor(options: WebSocketOptions<Params, Query, Headers>) {
     super();
@@ -147,7 +192,9 @@ export class Ws<
       parsedHeaders = this.headersSchema.parse(headers);
     } catch (error) {
       if (error instanceof ValidationError) {
-        throw new BadRequestError(error.format());
+        throw new BadRequestError(error.format(), undefined, {
+          cause: error,
+        });
       }
       throw error;
     }
@@ -158,45 +205,5 @@ export class Ws<
       headers: parsedHeaders,
       rawHeaders: headers,
     });
-    return undefined;
-  }
-
-  public documentation(): object {
-    const parameters = [
-      ...paramDocs(this.options.params, 'path', []),
-      ...paramDocs(this.options.query, 'query', []),
-      ...paramDocs(this.options.headers, 'header', []),
-    ];
-    return {
-      tags: [this.options.category],
-      summary: this.options.summary,
-      description: this.options.description,
-      parameters,
-      responses: {
-        '101': {
-          description: 'Switching to WebSocket',
-        },
-        '400': {
-          description: 'Upgrading to WebSocket failed',
-          content: {
-            'application/json': {
-              schema: {
-                type: 'object',
-                properties: {
-                  status: {
-                    type: 'number',
-                    example: 400,
-                  },
-                  errorMessage: {
-                    type: 'string',
-                    example: 'Upgrading to WebSocket failed.',
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    };
   }
 }

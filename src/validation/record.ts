@@ -13,7 +13,9 @@ class RecordSchema<
     this.valueSchema = valueSchema;
   }
 
-  public parse(obj: unknown): Record<string, Typeof<ValueSchema> | undefined> {
+  protected override parseValue(
+    obj: unknown,
+  ): Record<string, Typeof<ValueSchema> | undefined> {
     if (typeof obj !== 'object') {
       throw new ValidationError([
         new Issue([], `Expected object but got ${typeof obj}`),
@@ -24,11 +26,19 @@ class RecordSchema<
         new Issue([], 'Expected object but got null'),
       ]);
     }
-    const result: Record<string, Typeof<ValueSchema>> = {};
+    if (Array.isArray(obj)) {
+      throw new ValidationError([
+        new Issue([], 'Expected object but got array'),
+      ]);
+    }
+    const entries: [string, Typeof<ValueSchema>][] = [];
     const issues: Issue[] = [];
-    for (const key in obj) {
+    for (const [key, value] of Object.entries(obj)) {
       try {
-        result[key] = this.valueSchema.parse(obj[key as keyof typeof obj]);
+        entries.push([
+          key,
+          this.valueSchema.parse(value) as Typeof<ValueSchema>,
+        ]);
       } catch (error) {
         if (error instanceof ValidationError) {
           issues.push(...error.withPrefix(key));
@@ -40,10 +50,12 @@ class RecordSchema<
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
-    return result;
+    // `Object.fromEntries` defines own properties, so an input key of
+    // `__proto__` becomes a plain key instead of reassigning the prototype.
+    return Object.fromEntries(entries);
   }
 
-  public documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       type: 'object',
       additionalProperties: this.valueSchema.documentation(),

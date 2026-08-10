@@ -7,7 +7,7 @@ test('Validate Optional', () => {
   const schema = number().optional().describe('Optional', 3);
   expect(schema.documentation()).toStrictEqual({
     description: 'Optional',
-    example: 3,
+    examples: [3],
     type: 'number',
   });
   expect(schema.isOptional()).toBe(true);
@@ -25,8 +25,11 @@ test('Validate Default Undefined', () => {
 });
 
 test('Validate Default Null', () => {
+  // `default` only fills in for `undefined`. Use `.nullable()` to allow null.
   const schema = number().default(0);
-  expect(schema.parse(null)).toStrictEqual(0);
+  expect(() => schema.parse(null)).toThrow(
+    'Error at ``: Expected number but got object.',
+  );
 });
 
 test('Validate Default Valid Value', () => {

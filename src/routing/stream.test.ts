@@ -31,7 +31,7 @@ const app = new Yedra().use(
 );
 
 test('Server Stream', async () => {
-  const context = await app.listen(27536, { quiet: true });
+  const context = await app.listen(0, { quiet: true });
   const input = new ReadableStream({
     async start(controller) {
       for (const c of 'Hello, world!') {
@@ -41,7 +41,7 @@ test('Server Stream', async () => {
       controller.close();
     },
   });
-  const response = await fetch('http://localhost:27536/stream', {
+  const response = await fetch(`http://localhost:${context.port}/stream`, {
     method: 'POST',
     body: input,
     duplex: 'half',
@@ -52,7 +52,7 @@ test('Server Stream', async () => {
 });
 
 test('Server Documentation', async () => {
-  const context = await app.listen(27560, {
+  const context = await app.listen(0, {
     docs: {
       title: 'My API',
       description: 'Some description.',
@@ -60,7 +60,7 @@ test('Server Documentation', async () => {
     },
     quiet: true,
   });
-  const response = await fetch('http://localhost:27560/openapi.json');
+  const response = await fetch(`http://localhost:${context.port}/openapi.json`);
   expect(await response.json()).toStrictEqual({
     components: {
       schemas: {},
@@ -71,7 +71,7 @@ test('Server Documentation', async () => {
       description: 'Some description.',
       version: '0.2.0',
     },
-    openapi: '3.0.2',
+    openapi: '3.1.1',
     paths: {
       '/stream': {
         post: {
@@ -109,6 +109,27 @@ test('Server Documentation', async () => {
                 },
               },
               description: 'Bad Request',
+            },
+            // this endpoint reads a body, so `maxBodySize` applies to it
+            '413': {
+              content: {
+                'application/json': {
+                  schema: {
+                    properties: {
+                      code: { type: 'string' },
+                      errorMessage: {
+                        type: 'string',
+                      },
+                      status: {
+                        type: 'number',
+                      },
+                    },
+                    required: ['status', 'errorMessage'],
+                    type: 'object',
+                  },
+                },
+              },
+              description: 'Content Too Large',
             },
           },
           security: [],

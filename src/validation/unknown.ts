@@ -1,11 +1,11 @@
 import { ModifiableSchema } from './modifiable.js';
 
 class UnknownSchema extends ModifiableSchema<unknown> {
-  public override parse(obj: unknown): unknown {
+  protected override parseValue(obj: unknown): unknown {
     return obj;
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return {};
   }
 }

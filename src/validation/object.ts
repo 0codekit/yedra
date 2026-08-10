@@ -24,7 +24,7 @@ export class ObjectSchema<
   }>
 > {
   public readonly shape: Shape;
-  private lax: boolean;
+  private readonly lax: boolean;
 
   public constructor(shape: Shape, lax: boolean) {
     super();
@@ -32,7 +32,7 @@ export class ObjectSchema<
     this.lax = lax;
   }
 
-  public override parse(obj: unknown): MakeFieldsOptional<{
+  protected override parseValue(obj: unknown): MakeFieldsOptional<{
     [K in keyof Shape]: Typeof<Shape[K]>;
   }> {
     if (typeof obj !== 'object') {
@@ -40,36 +40,49 @@ export class ObjectSchema<
         new Issue([], `Expected object but got ${typeof obj}`),
       ]);
     }
-    if (obj == null) {
+    if (obj === null) {
       throw new ValidationError([
         new Issue([], 'Expected object but got null'),
       ]);
     }
-    const result = {} as {
-      [K in keyof Shape]: Typeof<Shape[K]>;
-    };
+    if (Array.isArray(obj)) {
+      throw new ValidationError([
+        new Issue([], 'Expected object but got array'),
+      ]);
+    }
+    const entries: [string, unknown][] = [];
     const issues: Issue[] = [];
-    for (const prop in this.shape) {
-      const propSchema = this.shape[prop];
-      if (propSchema instanceof Schema) {
-        if (!(prop in obj || propSchema.isOptional())) {
-          issues.push(new Issue([prop], 'Required'));
-          continue;
-        }
-        try {
-          result[prop] = propSchema.parse(obj[prop as keyof typeof obj]);
-        } catch (error) {
-          if (error instanceof ValidationError) {
-            issues.push(...error.withPrefix(prop));
-          } else {
-            throw error;
-          }
+    for (const [prop, propSchema] of Object.entries(this.shape) as [
+      keyof Shape & string,
+      Shape[keyof Shape],
+    ][]) {
+      if (!(propSchema instanceof Schema)) {
+        continue;
+      }
+      // `Object.hasOwn` rather than `in`, so that inherited members such as
+      // `toString` are not mistaken for a value the caller supplied.
+      if (!(Object.hasOwn(obj, prop) || propSchema.isOptional())) {
+        issues.push(new Issue([prop], 'Required'));
+        continue;
+      }
+      try {
+        entries.push([prop, propSchema.parse(obj[prop as keyof typeof obj])]);
+      } catch (error) {
+        if (error instanceof ValidationError) {
+          issues.push(...error.withPrefix(prop));
+        } else {
+          throw error;
         }
       }
     }
     if (!this.lax) {
-      for (const prop in obj) {
-        if (prop in this.shape) {
+      for (const prop of Object.keys(obj)) {
+        // `Object.hasOwn` rather than `in` for the same reason as above, in the
+        // other direction: `in` walks the shape's prototype chain, so an input
+        // key named after an `Object.prototype` member — `toString`,
+        // `constructor`, `valueOf`, `__proto__` — counted as recognised and was
+        // then silently dropped instead of being reported.
+        if (Object.hasOwn(this.shape, prop)) {
           continue;
         }
         issues.push(new Issue([prop], 'Unrecognized'));
@@ -78,14 +91,17 @@ export class ObjectSchema<
     if (issues.length > 0) {
       throw new ValidationError(issues);
     }
-    return result;
+    // `Object.fromEntries` defines own properties, so a field literally named
+    // `__proto__` becomes a key rather than reassigning the prototype.
+    return Object.fromEntries(entries) as MakeFieldsOptional<{
+      [K in keyof Shape]: Typeof<Shape[K]>;
+    }>;
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     const properties: Record<string, object> = {};
     const required: string[] = [];
-    for (const prop in this.shape) {
-      const propSchema = this.shape[prop];
+    for (const [prop, propSchema] of Object.entries(this.shape)) {
       if (propSchema instanceof Schema) {
         if (!propSchema.isOptional()) {
           required.push(prop);
@@ -104,7 +120,8 @@ export class ObjectSchema<
 
 /**
  * A schema matching a JavaScript object of the specified shape. Fields which
- * can be undefined are automatically marked as optional.
+ * can be undefined are automatically marked as optional. Unknown keys are
+ * rejected; use `laxObject` to allow them.
  * @param shape - The object shape.
  *
  * ```typescript
@@ -116,6 +133,11 @@ export const object = <Shape extends Record<string, Schema<unknown>>>(
   shape: Shape,
 ): ObjectSchema<Shape> => new ObjectSchema(shape, false);
 
+/**
+ * A schema matching a JavaScript object of the specified shape, ignoring any
+ * keys that are not part of the shape.
+ * @param shape - The object shape.
+ */
 export const laxObject = <Shape extends Record<string, Schema<unknown>>>(
   shape: Shape,
 ): ObjectSchema<Shape> => new ObjectSchema(shape, true);

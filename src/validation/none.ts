@@ -10,7 +10,9 @@ export class NoneBody extends BodyType<undefined, undefined> {
   }
 
   public bodyDocs(): object {
-    // TODO
+    // Unreachable in practice: an endpoint with no body omits `requestBody`
+    // from its documentation entirely rather than documenting an empty one,
+    // and `none()` is internal, so this is never a response body either.
     return {};
   }
 }

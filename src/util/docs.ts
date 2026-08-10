@@ -13,18 +13,18 @@ export const paramDocs = <Params extends Record<string, Schema<unknown>>>(
   security: SecurityScheme[],
 ): object[] => {
   const result: object[] = [];
-  for (const name in params) {
+  for (const [name, param] of Object.entries(params)) {
     if (isAuthToken(name, position, security)) {
       // don't include auth tokens in the documentation, they're already
       // handled by the separate authentication feature of OpenAPI
       continue;
     }
-    const docs = params[name].documentation();
+    const docs = param.documentation();
     result.push({
       name,
       in: position,
       description: 'description' in docs ? docs.description : undefined,
-      required: !params[name].isOptional(),
+      required: !param.isOptional(),
       schema: docs,
     });
   }
@@ -58,14 +58,12 @@ const isAuthToken = (
         // http auth token has to be in authorization header
         return true;
       }
-    } else {
-      if (
-        scheme.scheme.in === position &&
-        paramName.toLowerCase() === scheme.scheme.name.toLowerCase()
-      ) {
-        // API key has to have the correct name and be in the correct position
-        return true;
-      }
+    } else if (
+      scheme.scheme.in === position &&
+      paramName.toLowerCase() === scheme.scheme.name.toLowerCase()
+    ) {
+      // API key has to have the correct name and be in the correct position
+      return true;
     }
   }
   return false;

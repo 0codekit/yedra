@@ -2,13 +2,44 @@ import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
 
 class DateSchema extends ModifiableSchema<Date> {
-  public override parse(obj: unknown): Date {
+  /**
+   * Set the earliest date allowed.
+   * @param value - The minimum date.
+   */
+  public min(value: Date): this {
+    return this.refine(
+      (parsed) =>
+        parsed.getTime() >= value.getTime() ||
+        `Must be at or after ${value.toISOString()}`,
+      { minimum: value.toISOString() },
+    );
+  }
+
+  /**
+   * Set the latest date allowed.
+   * @param value - The maximum date.
+   */
+  public max(value: Date): this {
+    return this.refine(
+      (parsed) =>
+        parsed.getTime() <= value.getTime() ||
+        `Must be at or before ${value.toISOString()}`,
+      { maximum: value.toISOString() },
+    );
+  }
+
+  protected override parseValue(obj: unknown): Date {
     if (obj instanceof Date) {
+      if (Number.isNaN(obj.getTime())) {
+        throw new ValidationError([
+          new Issue([], 'Expected date but got an invalid Date'),
+        ]);
+      }
       return obj;
     }
     if (typeof obj === 'string' || typeof obj === 'number') {
       const date = new Date(obj);
-      if (date.toString() !== 'Invalid Date') {
+      if (!Number.isNaN(date.getTime())) {
         return date;
       }
     }
@@ -17,7 +48,7 @@ class DateSchema extends ModifiableSchema<Date> {
     ]);
   }
 
-  public override documentation(): object {
+  protected override baseDocumentation(): object {
     return {
       type: 'string',
       format: 'date-time',

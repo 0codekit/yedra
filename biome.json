@@ -2,8 +2,19 @@
 	"$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
 	"linter": {
 		"rules": {
+			"recommended": true,
 			"suspicious": {
-				"useAwait": "error"
+				"noShadow": "error",
+				"noForIn": "error"
+			},
+			"style": {
+				"useConsistentMemberAccessibility": {
+					"level": "error",
+					"options": {
+						"accessibility": "explicit"
+					}
+				},
+				"useReadonlyClassProperties": "error"
 			}
 		}
 	},
