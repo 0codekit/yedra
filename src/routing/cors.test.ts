@@ -177,18 +177,42 @@ test('A Wildcard Without Credentials Does Not Vary', async () => {
   await context.stop();
 });
 
-test('A Wildcard With Credentials Echoes The Origin And Varies', async () => {
+test('A Wildcard Cannot Be Combined With Credentials', () => {
+  // The CORS specification refuses `*` for a credentialed request, and
+  // answering it by reflecting whatever `Origin` arrived would defeat that
+  // check rather than honour it — "any site may act as the logged-in user and
+  // read the result" is almost never what someone means. So the type refuses
+  // the combination outright, at the only moment it can be caught for free.
+  // @ts-expect-error `credentials` is not available alongside `origins: '*'`
+  const invalid: CorsConfig = { origins: '*', credentials: true };
+  expect(invalid.origins).toBe('*');
+});
+
+test('Every Origin With Credentials Is Spelled As A Predicate', async () => {
   const context = await app({
-    get: { origins: '*', credentials: true },
+    get: { origins: () => true, credentials: true },
   }).listen(0, { quiet: true });
   const response = await fetch(`http://localhost:${context.port}/thing`, {
     headers: { origin: APP_ORIGIN },
   });
   await response.text();
-  // `*` is not a legal answer to a credentialed request
+  // the concrete origin, since `*` is not a legal answer to a credentialed
+  // request — and saying it this way makes the intent explicit
   expect(response.headers.get('access-control-allow-origin')).toBe(APP_ORIGIN);
   expect(response.headers.get('access-control-allow-credentials')).toBe('true');
   expect(response.headers.get('vary')).toBe('origin');
+  await context.stop();
+});
+
+test('A Wildcard Answers A Request That Sent No Origin', async () => {
+  const context = await app({ get: { origins: '*' } }).listen(0, {
+    quiet: true,
+  });
+  // Unconditional, so the header is a constant and no cache keys on anything.
+  const response = await fetch(`http://localhost:${context.port}/thing`);
+  await response.text();
+  expect(response.headers.get('access-control-allow-origin')).toBe('*');
+  expect(response.headers.get('vary')).toBeNull();
   await context.stop();
 });
 

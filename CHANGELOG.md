@@ -49,6 +49,16 @@ rejections, and a limit that did not reach every body type.
   from JavaScript, so a cross-origin caller sees an opaque network error rather
   than the 400 or 413 it was sent.
 
+  `origins: '*'` cannot be combined with `credentials`, and the type refuses
+  it rather than reflecting whatever `Origin` arrived: the CORS specification
+  forbids the wildcard for a credentialed request precisely because "any site
+  may act as the logged-in user and read the result" is almost never meant, and
+  echoing the caller's origin would defeat that check rather than honour it.
+  `origins: () => true` says it explicitly where it really is meant, the same
+  spelling `websocket.origins` uses. Note that an `Authorization` header the
+  caller sets itself is *not* what `credentials` covers — it is an ordinary
+  header, belongs in `headers`, and works with `origins: '*'`.
+
   `Vary: Origin` is set whenever the answer depends on the request's origin,
   and appended to the `Vary: Accept-Encoding` a static asset already carries
   rather than replacing it. Only an uncredentialed `'*'` is exempt, being the

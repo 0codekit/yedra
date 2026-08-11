@@ -10,21 +10,17 @@ import type { ResponseHeaders } from './rest.js';
  * credentials are involved, and the methods a preflight may be told about
  * depend on the method it asked about.
  */
-export type CorsConfig = {
-  /**
-   * The origins that may read the response. `'*'` allows any, a list allows
-   * exactly those, and a predicate decides per request.
-   *
-   * `'*'` cannot be combined with `credentials`: the CORS specification refuses
-   * the wildcard for a credentialed request, so the concrete origin is echoed
-   * instead, and a request that sends no `Origin` is left without the header.
-   */
-  origins: '*' | string[] | ((origin: string) => boolean);
+type CorsBase = {
   /**
    * The request headers a browser may send. Anything beyond the CORS-safelisted
    * ones has to be listed here, `content-type: application/json` and
    * `authorization` included — a preflight asking for a header that is not
    * listed is refused.
+   *
+   * Note that an `Authorization` header the caller sets itself, a bearer token
+   * for instance, is an ordinary header as far as CORS is concerned: list it
+   * here and it works, `origins: '*'` included. It is not what `credentials`
+   * means.
    */
   headers?: string[];
   /**
@@ -33,26 +29,53 @@ export type CorsConfig = {
    * pagination total — has to be named.
    */
   expose?: string[];
-  /**
-   * Whether the browser may send cookies and HTTP authentication, and read the
-   * response when it did.
-   */
-  credentials?: boolean;
   /** How long, in seconds, a browser may reuse a preflight result. */
   maxAge?: number;
 };
+
+export type CorsConfig = CorsBase &
+  (
+    | {
+        /** Every origin may read the response. */
+        origins: '*';
+        /**
+         * Not available alongside `origins: '*'`. The CORS specification
+         * refuses the wildcard for a credentialed request precisely because
+         * "any site may act as the logged-in user and read the result" is
+         * almost never what someone means, and answering it by reflecting
+         * whatever `Origin` arrived would defeat that check rather than honour
+         * it. Say `origins: () => true` if it really is what you mean.
+         */
+        credentials?: false;
+      }
+    | {
+        /**
+         * The origins that may read the response: exactly those in the list, or
+         * whatever the predicate accepts. A predicate is also how to allow every
+         * origin for a credentialed request, since `'*'` cannot be.
+         */
+        origins: string[] | ((origin: string) => boolean);
+        /**
+         * Whether the browser may send cookies and HTTP authentication, and read
+         * the response when it did. This is the browser's ambient credentials —
+         * `fetch(url, { credentials: 'include' })` — not an `Authorization`
+         * header the caller sets itself, which is an ordinary header and belongs
+         * in `headers`.
+         */
+        credentials?: boolean;
+      }
+  );
 
 /**
  * Whether the `Access-Control-Allow-Origin` this config produces depends on the
  * request's `Origin` — which is exactly when `Vary: Origin` is required.
  *
- * Only an uncredentialed `'*'` is constant. Every other config differs by
- * origin, including a list of exactly one: an allowed origin is answered with
- * the header and everyone else without it, so the *presence* of the header
- * varies even where its value could not.
+ * Only `'*'` is constant, and the type guarantees it is never credentialed.
+ * Every other config differs by origin, including a list of exactly one: an
+ * allowed origin is answered with the header and everyone else without it, so
+ * the *presence* of the header varies even where its value could not.
  */
-const variesByOrigin = (config: CorsConfig): boolean =>
-  !(config.origins === '*' && config.credentials !== true);
+const variesByOrigin = (config: CorsConfig): boolean => config.origins !== '*';
 
 /**
  * The value to answer with, or undefined if this origin may not read the
@@ -63,9 +86,11 @@ const allowedOrigin = (
   origin: string | undefined,
 ): string | undefined => {
   if (config.origins === '*') {
-    // `*` is not a legal answer to a credentialed request, so the concrete
-    // origin is echoed — which a request that sent none cannot be given.
-    return config.credentials === true ? origin : '*';
+    // Unconditional, and answered even to a request that sent no `Origin`, so
+    // that the header is a constant and no cache has to key on anything. The
+    // type refuses `credentials` here, which is the only case that would have
+    // forced a concrete origin.
+    return '*';
   }
   if (origin === undefined) {
     return undefined;
