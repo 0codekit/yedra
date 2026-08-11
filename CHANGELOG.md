@@ -61,11 +61,9 @@ rejections, and a limit that did not reach every body type.
 
   `Vary: Origin` is set whenever the answer depends on the request's origin,
   and appended to the `Vary: Accept-Encoding` a static asset already carries
-  rather than replacing it. Only an uncredentialed `'*'` is exempt, being the
-  one configuration whose answer is a constant — a list of exactly one origin
-  still varies, because the *presence* of the header differs even where its
-  value cannot. `'*'` is not a legal answer to a credentialed request, so with
-  `credentials: true` the concrete origin is echoed instead.
+  rather than replacing it. Only `'*'` is exempt, being the one configuration
+  whose answer is a constant — a list of exactly one origin still varies,
+  because the *presence* of the header differs even where its value cannot.
 
   `serve.cors` may be a function of the path, so one directory can serve fonts
   cross-origin while the application's own files stay same-origin.
