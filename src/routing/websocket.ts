@@ -22,7 +22,16 @@ type Handler<Event extends keyof WebSocketEvents> = (
 class YedraWebSocket {
   private readonly ws: NodeWebSocket;
 
-  private messageQueue: Buffer[] = [];
+  /**
+   * Events that arrived before a handler for them existed, kept per event so
+   * that the first handler still sees them. A handler is often registered after
+   * an `await` — a session lookup, say — and a socket that closes or fails in
+   * that window would otherwise deliver nothing at all, leaving the endpoint
+   * waiting for a `close` that has already happened.
+   */
+  private readonly queues: {
+    [Event in keyof WebSocketEvents]: WebSocketEvents[Event][];
+  } = { message: [], close: [], error: [] };
 
   private readonly handlers: {
     [Event in keyof WebSocketEvents]: Handler<Event>[];
@@ -31,12 +40,6 @@ class YedraWebSocket {
   public constructor(ws: NodeWebSocket) {
     this.ws = ws;
     ws.on('message', (data: Buffer) => {
-      if (this.handlers.message.length === 0) {
-        // no message handler has been registered yet, so hold on to the message
-        // until one is
-        this.messageQueue.push(data);
-        return;
-      }
       this.emit('message', data);
     });
     ws.on('close', (code: number, reason: Buffer) => {
@@ -53,9 +56,11 @@ class YedraWebSocket {
    * registering a second one for the same event does not replace the first, and
    * they run in the order they were added.
    *
-   * Messages that arrive before the first `message` handler is registered are
+   * Events that arrive before the first handler for them is registered are
    * queued and delivered to it, so a handler set up after an `await` does not
-   * miss them.
+   * miss them. This covers `close` and `error` as well as `message`: a socket
+   * that fails during that window is exactly the case a handler most needs to
+   * hear about.
    *
    * An `error` handler sees connection failures — a protocol violation, or a
    * message larger than the configured `maxPayload`. The socket is closing by
@@ -67,14 +72,14 @@ class YedraWebSocket {
     event: Event,
     handler: Handler<Event>,
   ): void {
+    const first = this.handlers[event].length === 0;
     this.handlers[event].push(handler);
-    if (event !== 'message' || this.messageQueue.length === 0) {
+    if (!first) {
       return;
     }
-    const queued = this.messageQueue;
-    this.messageQueue = [];
-    for (const message of queued) {
-      this.emit('message', message);
+    const queued = this.queues[event].splice(0);
+    for (const args of queued) {
+      this.emit(event, ...args);
     }
   }
 
@@ -82,6 +87,10 @@ class YedraWebSocket {
     event: Event,
     ...args: WebSocketEvents[Event]
   ): void {
+    if (this.handlers[event].length === 0) {
+      this.queues[event].push(args);
+      return;
+    }
     for (const handler of this.handlers[event]) {
       // A handler may be async, and nothing awaits it. Report a rejection
       // rather than letting it become an unhandled rejection that takes the

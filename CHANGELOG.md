@@ -6,6 +6,56 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While yedra is below 1.0.0, breaking changes may land in minor releases.
 
+## [Unreleased]
+
+Follow-up fixes to 0.21.0, all in the same classes of bug that release set out
+to remove: stateful regular expressions, unhandled rejections, and a limit that
+did not reach every body type.
+
+### Fixed
+
+- **A `RegExp` with the `g` or `y` flag passed to `.pattern()` rejected every
+  other value.** `RegExp.test` advances `lastIndex` on a global or sticky
+  pattern and resumes from there, so `y.string().pattern(/[a-z]+/g)` accepted
+  `'abc'`, rejected the next `'abc'`, and so on — the same mistake that
+  `serve.immutable.pattern` was fixed for in 0.21.0. Both now go through one
+  helper that drops `g` and `y` and keeps every other flag. `serve.immutable`
+  rebuilt the pattern from `source` alone, so it was also silently discarding
+  `i`.
+- **A failing extra metrics collector took the process down.** The metrics
+  server's request handler was an `async` listener that nothing caught, so a
+  `metrics.get` that rejected became an unhandled rejection — fatal under
+  Node's default — and left the response unfinished, hanging the scrape until
+  the client gave up. The collector is now awaited before anything is written,
+  a failure is answered with a 500, and the endpoint answers `HEAD` and sets
+  `Content-Length`.
+- **A WebSocket handler registered after an `await` missed `close` and
+  `error`.** Messages were queued across that window but the other two events
+  were dropped, so an endpoint that looked up a session before subscribing
+  could wait forever for a socket that had already gone. All three events are
+  queued until the first handler for them is registered.
+- **An oversized `y.stream()` body was answered with a 500 rather than a 413.**
+  A streamed body is handed to the endpoint before it is read, so the limit is
+  only reached once the endpoint pulls from the stream — after `deserialize`
+  returned, and past the point that mapped the failure onto a status. Only
+  bodies that understate their length or send none at all were affected; a
+  truthful `Content-Length` is still refused up front.
+- **A 405 for a method yedra does not route at all carried no `Allow`
+  header**, which RFC 9110 requires on every 405. A known method on the wrong
+  route already sent one.
+- **A client that disconnected mid-stream left the response waiting for a
+  `drain` that never came**, holding the response and the source stream open
+  for the life of the process. `close` and `error` end the wait too.
+
+### Changed
+
+- **An optional path segment is documented without its `?`.** `/x/:id?`
+  produced the path template `/x/{id?}`, which names a parameter called `id?`
+  that the operation never declares, and put a `?` into the `operationId` built
+  from it; an optional literal produced `/x/def?`, which reads as the start of
+  a query string. Both are now documented as the path with the segment
+  present, which is as close as OpenAPI can get. Matching is unchanged.
+
 ## [0.21.0] - 2026-08-10
 
 A large renovation release. Every constraint in the schema library is now built

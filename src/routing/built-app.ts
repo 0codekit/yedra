@@ -201,7 +201,13 @@ export class BuiltApp {
     // omits.
     const method = req.method === 'HEAD' ? 'GET' : req.method;
     if (!METHODS.includes(method)) {
-      return errorResponse(405, `Method \`${req.method}\` not allowed.`);
+      // RFC 9110 requires a 405 to say what the path does accept, and this one
+      // is as much a 405 as the one below.
+      const allowed = this.allowedMethods(req.url.pathname);
+      return {
+        ...errorResponse(405, `Method \`${req.method}\` not allowed.`),
+        ...(allowed.length > 0 && { headers: { allow: allowed.join(', ') } }),
+      };
     }
     if (method === 'GET' && req.url.pathname === '/openapi.json') {
       return {

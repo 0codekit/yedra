@@ -225,15 +225,30 @@ class ConcreteRestEndpoint<
     }
     // Reaching here means nothing pushed an issue, so every part above parsed
     // successfully. `body` is genuinely undefined for endpoints without one.
-    return await this.options.do({
-      url: req.url,
-      method: this._method,
-      params: parsedParams as Typeof<ObjectSchema<Params>>,
-      query: parsedQuery as Typeof<ObjectSchema<Query>>,
-      headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
-      rawHeaders: req.headers,
-      body: parsedBody as Typeof<Req>,
-    });
+    try {
+      return await this.options.do({
+        url: req.url,
+        method: this._method,
+        params: parsedParams as Typeof<ObjectSchema<Params>>,
+        query: parsedQuery as Typeof<ObjectSchema<Query>>,
+        headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
+        rawHeaders: req.headers,
+        body: parsedBody as Typeof<Req>,
+      });
+    } catch (error) {
+      if (error instanceof BodySizeExceededError) {
+        // A `y.stream()` body is handed over before it has been read, so the
+        // limit is only reached once the endpoint pulls from the stream — after
+        // `deserialize` returned. Without this the same oversized upload that
+        // any other body type answers with a 413 becomes a 500.
+        throw new PayloadTooLargeError(
+          `Request body exceeds the maximum of ${maxBodySize} bytes.`,
+          undefined,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
   }
 
   public isHidden(): boolean {

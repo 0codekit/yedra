@@ -133,8 +133,25 @@ export const writeResponse = async (
     for await (const chunk of payload) {
       const canContinue = res.write(chunk);
       if (!canContinue) {
-        // Buffer full - wait for drain before continuing
-        await new Promise<void>((resolve) => res.once('drain', resolve));
+        // Buffer full — wait for drain before continuing. `close` and `error`
+        // are waited on too: a client that disconnects mid-stream never drains,
+        // and waiting on `drain` alone would leave this loop, the response and
+        // whatever the source stream holds open for the life of the process.
+        await new Promise<void>((resolve) => {
+          const done = (): void => {
+            res.off('drain', done);
+            res.off('close', done);
+            res.off('error', done);
+            resolve();
+          };
+          res.once('drain', done);
+          res.once('close', done);
+          res.once('error', done);
+        });
+        if (res.writableEnded || res.destroyed) {
+          // the socket went away while waiting
+          return;
+        }
       }
     }
   } catch {

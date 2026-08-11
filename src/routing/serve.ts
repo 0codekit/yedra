@@ -4,6 +4,7 @@ import { extname, join, sep } from 'node:path';
 import type { URL } from 'node:url';
 import { isUint8Array } from 'node:util/types';
 import mime from 'mime';
+import { statelessCopy } from '../validation/regex.js';
 import {
   compressAll,
   DEFAULT_COMPRESSION_THRESHOLD,
@@ -165,12 +166,14 @@ export class StaticAssets {
     }
     // `RegExp.test` advances `lastIndex` when the pattern is global, so reusing
     // the caller's object across files would match every other one. Assets are
-    // loaded concurrently, which would make that nondeterministic.
+    // loaded concurrently, which would make that nondeterministic. Only `g` and
+    // `y` are dropped: rebuilding from `source` alone would also discard `i`,
+    // which a pattern matching file extensions may well rely on.
     const immutable =
       config.immutable === undefined
         ? undefined
         : {
-            pattern: new RegExp(config.immutable.pattern.source),
+            pattern: statelessCopy(config.immutable.pattern),
             maxAge: config.immutable.maxAge,
           };
     await Promise.all(

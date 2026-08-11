@@ -1,3 +1,4 @@
+import { request } from 'node:http';
 import { expect, test } from 'vitest';
 import { boolean, object, string } from '../lib.js';
 import { Yedra } from './app.js';
@@ -270,5 +271,35 @@ test('OPTIONS Reports GET For A Path A Function Fallback Answers', async () => {
   // and the path really is answered, so the report was accurate
   const get = await fetch(`http://localhost:${context.port}/anything`);
   expect(await get.text()).toStrictEqual('from the fallback');
+  await context.stop();
+});
+
+test('A 405 For An Unrouted Method Also Names What Would Work', async () => {
+  const context = await app().listen(0, { quiet: true });
+  // A method yedra does not dispatch at all took a different path out than a
+  // known method on the wrong route, and answered without an `Allow` header —
+  // which RFC 9110 requires on every 405.
+  // `fetch` refuses to send TRACE at all, so this goes out over node:http.
+  const response = await new Promise<{
+    status: number;
+    allow: string | undefined;
+  }>((resolve, reject) => {
+    const req = request(
+      { port: context.port, path: '/thing', method: 'TRACE' },
+      (res) => {
+        res.resume();
+        res.on('end', () =>
+          resolve({
+            status: res.statusCode ?? 0,
+            allow: res.headers.allow,
+          }),
+        );
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+  expect(response.status).toBe(405);
+  expect(response.allow).toBe('GET, HEAD, OPTIONS, POST');
   await context.stop();
 });
