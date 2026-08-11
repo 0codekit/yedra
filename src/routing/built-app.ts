@@ -15,6 +15,12 @@ import {
   trace,
 } from '@opentelemetry/api';
 import { Counter } from '../util/counter.js';
+import {
+  type CorsConfig,
+  corsHeaders,
+  preflightHeaders,
+  withCorsHeaders,
+} from './cors.js';
 import { HttpError } from './errors.js';
 import { type MetricsOptions, RequestMetrics } from './metrics.js';
 import type { Path } from './path.js';
@@ -49,6 +55,14 @@ export const DEFAULT_MAX_BODY_SIZE = 10 * 1024 * 1024;
 type Method = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 const METHODS: readonly string[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+
+/**
+ * The single value of a request header that Node may have collected as an
+ * array. Used for headers where only one value is meaningful, such as `Origin`.
+ */
+const singleHeader = (
+  value: string | string[] | undefined,
+): string | undefined => (Array.isArray(value) ? value[0] : value);
 
 /**
  * Flatten Node's request headers, which repeat as arrays, into the single-valued
@@ -195,7 +209,7 @@ export class BuiltApp {
     headers: Record<string, string | string[] | undefined>;
   }): Promise<RoutedResponse> {
     if (req.method === 'OPTIONS') {
-      return this.optionsResponse(req.url.pathname);
+      return this.optionsResponse(req.url.pathname, req.headers);
     }
     // HEAD is answered exactly like GET, minus the body, which `writeResponse`
     // omits.
@@ -274,8 +288,22 @@ export class BuiltApp {
     },
   ): Promise<RoutedResponse> {
     const { route } = match;
+    const { cors } = match.endpoint;
+    // Applied to whatever comes back, failures included: without the header a
+    // browser hides the status from JavaScript, so a cross-origin caller sees
+    // an opaque network error rather than the 400 or 413 it was sent.
+    const addCors = (response: RoutedResponse): RoutedResponse =>
+      cors === undefined
+        ? response
+        : {
+            ...response,
+            headers: withCorsHeaders(
+              response.headers,
+              corsHeaders(cors, singleHeader(req.headers.origin)),
+            ),
+          };
     try {
-      return {
+      return addCors({
         route,
         ...(await match.endpoint.handle({
           url: req.url.pathname,
@@ -285,16 +313,19 @@ export class BuiltApp {
           query: Object.fromEntries(req.url.searchParams),
           headers: flattenHeaders(req.headers),
         })),
-      };
+      });
     } catch (error) {
       if (error instanceof HttpError) {
-        return {
+        return addCors({
           route,
           ...errorResponse(error.status, error.message, error.code),
-        };
+        });
       }
       console.error(error);
-      return { route, ...errorResponse(500, 'Internal Server Error.') };
+      return addCors({
+        route,
+        ...errorResponse(500, 'Internal Server Error.'),
+      });
     }
   }
 
@@ -322,21 +353,61 @@ export class BuiltApp {
   }
 
   /**
-   * Answer an `OPTIONS` request. yedra reports which methods the path accepts;
-   * it does not add CORS headers, since it has no cross-origin policy of its
-   * own — set those on the response or via `serve.headers`.
+   * Answer an `OPTIONS` request: which methods the path accepts, plus the CORS
+   * headers when this is a preflight for an endpoint that declared a `cors`
+   * configuration.
+   *
+   * A preflight is not a general question about the path. It carries
+   * `Access-Control-Request-Method`, naming exactly one method, so it is
+   * answered from the endpoint registered for that method — which is what
+   * lets two methods on one path hold different policies.
    */
-  private optionsResponse(pathname: string): Response {
+  private optionsResponse(
+    pathname: string,
+    headers: Record<string, string | string[] | undefined>,
+  ): Response {
     const methods = this.allowedMethods(pathname);
     if (methods.length === 0) {
       return errorResponse(404, `Path \`${pathname}\` not found.`);
     }
-    // No `Content-Length`: RFC 9110 forbids one on a 204.
-    return {
+    const base: Response = {
+      // No `Content-Length`: RFC 9110 forbids one on a 204.
       status: 204,
       body: Buffer.alloc(0),
       headers: { allow: methods.join(', ') },
     };
+    const requested = singleHeader(headers['access-control-request-method']);
+    const origin = singleHeader(headers.origin);
+    if (requested === undefined || origin === undefined) {
+      // An ordinary OPTIONS, not a preflight.
+      return base;
+    }
+    const cors =
+      this.corsFor(pathname, requested) ?? this.assets.cors(pathname);
+    if (cors === undefined) {
+      // Nothing here opts into cross-origin use. The browser refuses the
+      // preflight, which is the correct outcome.
+      return base;
+    }
+    return {
+      ...base,
+      headers: withCorsHeaders(
+        base.headers,
+        preflightHeaders(cors, origin, requested),
+      ),
+    };
+  }
+
+  /**
+   * The CORS configuration of the endpoint answering a method on a path, if
+   * there is one and it declared any.
+   */
+  private corsFor(pathname: string, method: string): CorsConfig | undefined {
+    if (!METHODS.includes(method)) {
+      return undefined;
+    }
+    return this.matchRestRoute(pathname, method as Method).result?.endpoint
+      .cors;
   }
 
   private matchRestRoute(

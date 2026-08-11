@@ -1,6 +1,7 @@
 import * as y from './lib.js';
 
 export { Yedra } from './routing/app.js';
+export type { CorsConfig } from './routing/cors.js';
 export { parseEnv } from './routing/env.js';
 export {
   BadRequestError,

@@ -8,9 +8,76 @@ While yedra is below 1.0.0, breaking changes may land in minor releases.
 
 ## [Unreleased]
 
-Follow-up fixes to 0.21.0, all in the same classes of bug that release set out
-to remove: stateful regular expressions, unhandled rejections, and a limit that
-did not reach every body type.
+CORS, and follow-up fixes to 0.21.0 — the latter all in the same classes of bug
+that release set out to remove: stateful regular expressions, unhandled
+rejections, and a limit that did not reach every body type.
+
+### Added
+
+- **`cors` on every endpoint**, and `serve.cors` for static assets. 0.21.0
+  started answering `OPTIONS` but gave no way to put anything on the response
+  except `Allow`, so a preflight could never be satisfied — which meant no
+  cross-origin request beyond a "simple" one worked at all: no JSON body, no
+  `Authorization`, no custom header.
+
+  ```typescript
+  new Post({
+    cors: {
+      origins: ['https://app.example.com'],
+      headers: ['authorization', 'content-type'],
+      credentials: true,
+      maxAge: 600,
+    },
+    // …
+  })
+  ```
+
+  Configured per endpoint rather than per app, so opening one route does not
+  quietly open the rest. `origins` takes `'*'`, a list, or a predicate, the way
+  `websocket.origins` does. `headers` lists what a browser may send, `expose`
+  what JavaScript may read, and `maxAge` how long a preflight result may be
+  reused.
+
+  A preflight carries `Access-Control-Request-Method`, naming exactly one
+  method, so it is answered from *that* method's endpoint — which is what lets
+  `GET` and `POST` on one path hold different policies. `Access-Control-Allow-
+  Methods` names only the method asked about, since listing the others would
+  claim they accept this origin when their own configuration may not.
+
+  The headers go on the real response as well as the preflight, failures
+  included: without `Access-Control-Allow-Origin` a browser hides the status
+  from JavaScript, so a cross-origin caller sees an opaque network error rather
+  than the 400 or 413 it was sent.
+
+  `Vary: Origin` is set whenever the answer depends on the request's origin,
+  and appended to the `Vary: Accept-Encoding` a static asset already carries
+  rather than replacing it. Only an uncredentialed `'*'` is exempt, being the
+  one configuration whose answer is a constant — a list of exactly one origin
+  still varies, because the *presence* of the header differs even where its
+  value cannot. `'*'` is not a legal answer to a credentialed request, so with
+  `credentials: true` the concrete origin is echoed instead.
+
+  `serve.cors` may be a function of the path, so one directory can serve fonts
+  cross-origin while the application's own files stay same-origin.
+
+### Changed
+
+- **Dynamic responses default to `Cache-Control: no-store`.** A response with
+  no `Cache-Control` and no `Expires` is *heuristically* cacheable: RFC 9111
+  lets a shared cache invent a freshness lifetime for a cacheable status on a
+  `GET`. yedra set the header only on static files, so a cookie-authenticated
+  `GET /me` behind a CDN could be stored and handed to the next caller —
+  only the `Authorization` header triggers the rule that keeps shared caches
+  off an authenticated response, and cookie auth does not. An endpoint that
+  returns its own `Cache-Control` still decides for itself, and static assets
+  keep theirs.
+- **`serve.headers` is documented as what it is**: the per-response security
+  headers a served frontend needs — `Content-Security-Policy`,
+  `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `Referrer-Policy`,
+  `Permissions-Policy`. It was introduced for CORS, which `serve.cors` now
+  covers properly. The option is unchanged and still supported; it is merged
+  before the CORS headers, so a leftover `Access-Control-*` value cannot
+  override a negotiated one.
 
 ### Fixed
 

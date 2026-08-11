@@ -101,6 +101,14 @@ export const writeResponse = async (
     payload = Buffer.from(JSON.stringify(response.body), 'utf-8');
     headers['content-type'] ??= 'application/json';
   }
+  // A response with no `Cache-Control` and no `Expires` is *heuristically*
+  // cacheable: RFC 9111 lets a shared cache invent a freshness lifetime for a
+  // cacheable status on a GET. For an API that is the wrong default — a
+  // cookie-authenticated `GET /me` behind a CDN could be stored and handed to
+  // the next caller, since only the `Authorization` header triggers the rule
+  // that keeps shared caches off an authenticated response. Static assets set
+  // their own value and keep it; an endpoint that wants to be cached says so.
+  headers['cache-control'] ??= 'no-store';
   if (!(payload instanceof ReadableStream) && !BODILESS_STATUSES.has(status)) {
     // The length is only knowable up front for a buffered body — and where it is
     // knowable it is authoritative, so it overrides rather than fills in. A
