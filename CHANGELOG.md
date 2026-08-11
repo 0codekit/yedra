@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While yedra is below 1.0.0, breaking changes may land in minor releases.
 
-## [Unreleased]
+## [0.21.1] - 2026-08-11
 
 CORS, and follow-up fixes to 0.21.0 — the latter all in the same classes of bug
 that release set out to remove: stateful regular expressions, unhandled
@@ -605,4 +605,5 @@ behaviour without a compile error. Anything generating clients from
 - The `onmessage` and `onclose` setters on `YedraWebSocket`, replaced by `on`.
 - The `uuid` runtime dependency.
 
+[0.21.1]: https://github.com/0codekit/yedra/releases/tag/v0.21.1
 [0.21.0]: https://github.com/0codekit/yedra/releases/tag/v0.21.0
