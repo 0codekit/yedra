@@ -79,14 +79,24 @@ test('Server Documentation', async () => {
           parameters: [],
           requestBody: {
             content: {
-              'application/octet-stream': {},
+              'application/octet-stream': {
+                schema: {
+                  type: 'string',
+                  contentMediaType: 'application/octet-stream',
+                },
+              },
             },
             required: true,
           },
           responses: {
             '200': {
               content: {
-                'application/octet-stream': {},
+                'application/octet-stream': {
+                  schema: {
+                    type: 'string',
+                    contentMediaType: 'application/octet-stream',
+                  },
+                },
               },
               description: 'Success',
             },

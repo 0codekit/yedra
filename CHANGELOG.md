@@ -37,9 +37,31 @@ did not reach every body type.
 - **An oversized `y.stream()` body was answered with a 500 rather than a 413.**
   A streamed body is handed to the endpoint before it is read, so the limit is
   only reached once the endpoint pulls from the stream — after `deserialize`
-  returned, and past the point that mapped the failure onto a status. Only
-  bodies that understate their length or send none at all were affected; a
-  truthful `Content-Length` is still refused up front.
+  returned, and past the point that mapped the failure onto a status. A
+  `BodySizeExceededError` that comes back out of the endpoint is now a 413,
+  which covers the endpoint that simply reads its stream. An endpoint that
+  catches its own read errors still owns the outcome, as it should: unlike a
+  buffered body, yedra does not do the reading and cannot answer for it. Only
+  bodies that understate their length or send none at all reach this path at
+  all; a truthful `Content-Length` is still refused up front.
+- **WebSocket spans were named `incoming_ws_connection`, every one of them,**
+  so traces could not be grouped by endpoint — the same defect the HTTP spans
+  were fixed for in 0.21.0, in the one place that fix did not reach. They are
+  now named `GET {route}` and carry `http.request.method`, `url.path`,
+  `url.scheme` (`ws`/`wss`), `http.route` and `http.response.status_code`,
+  in place of the single retired `http.url` attribute. A handler that throws
+  something other than an `HttpError` sets the span status to `ERROR`.
+- **`y.raw` and `y.stream` documented an empty Media Type Object.** The content
+  type itself was right; what was missing under it was any Schema Object, so a
+  generator had nothing to go on and typed the body as `any` rather than as
+  bytes. They now emit `type: 'string'` with `contentMediaType` — the OpenAPI
+  3.1 spelling of what 3.0 wrote as `format: 'binary'`.
+- **One unreadable file under `serve.dir` failed `build()` outright.** Assets
+  are loaded with `Promise.all`, so a single rejection took the whole app down:
+  `readdir` lists dangling symlinks, which `stat` refuses to follow, and any
+  file can be deleted or have its permissions changed between the listing and
+  the read. Such an entry is now skipped and reported, and the rest of the
+  directory is served.
 - **A 405 for a method yedra does not route at all carried no `Allow`
   header**, which RFC 9110 requires on every 405. A known method on the wrong
   route already sent one.

@@ -1,6 +1,12 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { URL } from 'node:url';
-import { context, propagation, SpanKind, trace } from '@opentelemetry/api';
+import {
+  context,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from '@opentelemetry/api';
 import { WebSocketServer } from 'ws';
 import { HttpError } from './errors.js';
 import type { WsEndpoint } from './websocket.js';
@@ -93,6 +99,8 @@ const originAllowed = (
 type WsMatch = {
   endpoint: WsEndpoint;
   params: Record<string, string>;
+  /** The matched route template, e.g. `/rooms/{id}`. */
+  route: string;
 };
 
 /**
@@ -139,47 +147,70 @@ export const createWebSocketServer = (options: {
     ws.on('error', logSocketError);
     const extractedContext = propagation.extract(context.active(), req.headers);
     context.with(extractedContext, () =>
-      trace
-        .getTracer('yedra')
-        .startActiveSpan(
-          'incoming_ws_connection',
-          { kind: SpanKind.SERVER },
-          async (span) => {
-            span.setAttribute('http.url', req.url ?? 'UNKNOWN');
-            let ended = false;
-            const end = () => {
-              if (ended) {
-                return;
-              }
-              ended = true;
-              span.end();
-            };
-            ws.once('close', end);
-            const url = new URL(req.url as string, 'http://localhost');
-            const match = options.matchRoute(url.pathname);
-            if (match === undefined) {
-              ws.close(4404);
-              end();
+      trace.getTracer('yedra').startActiveSpan(
+        // A handshake is a `GET` that is answered with a 101, so the span is
+        // named the way the HTTP ones are: the method, replaced with
+        // `{method} {route}` below once routing has resolved. Every connection
+        // sharing the single name `incoming_ws_connection` meant a backend
+        // could not group traces by endpoint, which is the whole point of
+        // naming a span.
+        'GET',
+        { kind: SpanKind.SERVER },
+        async (span) => {
+          const url = new URL(req.url as string, 'http://localhost');
+          // The same semantic conventions the HTTP spans use. The retired
+          // `http.url` was the only attribute here, and it is neither current
+          // nor enough to group or filter on.
+          span.setAttribute('http.request.method', 'GET');
+          span.setAttribute('url.path', url.pathname);
+          span.setAttribute(
+            'url.scheme',
+            'encrypted' in req.socket ? 'wss' : 'ws',
+          );
+          let ended = false;
+          const end = (): void => {
+            if (ended) {
               return;
             }
-            try {
-              const headers = Object.fromEntries(
-                Object.entries(req.headers).map(([key, value]) => [
-                  key,
-                  Array.isArray(value) ? value.join(',') : (value ?? ''),
-                ]),
-              );
-              await match.endpoint.handle(url, match.params, headers, ws);
-            } catch (error) {
-              if (error instanceof HttpError) {
-                ws.close(4000 + error.status, error.message);
-              } else {
-                console.error(error);
-                ws.close(1011, 'Internal Error');
-              }
+            ended = true;
+            span.end();
+          };
+          ws.once('close', end);
+          const match = options.matchRoute(url.pathname);
+          if (match === undefined) {
+            span.setAttribute('http.response.status_code', 404);
+            ws.close(4404);
+            end();
+            return;
+          }
+          span.updateName(`GET ${match.route}`);
+          span.setAttribute('http.route', match.route);
+          // The handshake itself succeeded; a failure below is reported through
+          // the close code and the span status rather than a status line.
+          span.setAttribute('http.response.status_code', 101);
+          try {
+            const headers = Object.fromEntries(
+              Object.entries(req.headers).map(([key, value]) => [
+                key,
+                Array.isArray(value) ? value.join(',') : (value ?? ''),
+              ]),
+            );
+            await match.endpoint.handle(url, match.params, headers, ws);
+          } catch (error) {
+            if (error instanceof HttpError) {
+              // The caller's fault, like a 4xx, so not the server's error.
+              ws.close(4000 + error.status, error.message);
+            } else {
+              console.error(error);
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: error instanceof Error ? error.message : undefined,
+              });
+              ws.close(1011, 'Internal Error');
             }
-          },
-        ),
+          }
+        },
+      ),
     );
   });
   return wss;

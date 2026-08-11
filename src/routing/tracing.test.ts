@@ -9,6 +9,7 @@ import { afterAll, expect, test } from 'vitest';
 import { boolean, object, string } from '../lib.js';
 import { Yedra } from './app.js';
 import { Get } from './rest.js';
+import { Ws } from './websocket.js';
 
 type Recorded = {
   name: string;
@@ -155,4 +156,73 @@ test('Only Server Errors Mark The Span As Failed', async () => {
   // with no route matched there is no template to name the span after
   expect(notFound?.name).toBe('GET');
   expect(notFound?.attributes['http.route']).toBeUndefined();
+});
+
+test('WebSocket Spans Are Named After The Route Too', async () => {
+  recorded.length = 0;
+  const context = await new Yedra()
+    .use(
+      '/rooms/:id',
+      new Ws({
+        category: 'Test',
+        summary: 'Room.',
+        params: { id: string() },
+        query: {},
+        headers: {},
+        do: (socket) => {
+          socket.close(1000);
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new WebSocket(`http://localhost:${context.port}/rooms/42`);
+  await new Promise((resolve) => {
+    ws.onclose = resolve;
+  });
+  // the client sees the close first; the span ends on the server's own event
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await context.stop();
+
+  // every connection used to share the name `incoming_ws_connection`, so no
+  // backend could group these by endpoint
+  expect(recorded[0]?.name).toBe('GET /rooms/{id}');
+  expect(recorded[0]?.kind).toBe(SpanKind.SERVER);
+  expect(recorded[0]?.ended).toBe(true);
+  // the retired `http.url` was the only attribute this span carried
+  expect(recorded[0]?.attributes).toStrictEqual({
+    'http.request.method': 'GET',
+    'url.path': '/rooms/42',
+    'url.scheme': 'ws',
+    'http.response.status_code': 101,
+    'http.route': '/rooms/{id}',
+  });
+  expect(recorded[0]?.status).toBeUndefined();
+});
+
+test('A WebSocket On No Route Is Not A Server Error', async () => {
+  recorded.length = 0;
+  const context = await new Yedra()
+    .use(
+      '/rooms/:id',
+      new Ws({
+        category: 'Test',
+        summary: 'Room.',
+        params: { id: string() },
+        query: {},
+        headers: {},
+        do: () => {},
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new WebSocket(`http://localhost:${context.port}/missing`);
+  await new Promise((resolve) => {
+    ws.onclose = resolve;
+  });
+  await context.stop();
+
+  expect(recorded[0]?.name).toBe('GET');
+  expect(recorded[0]?.attributes['http.response.status_code']).toBe(404);
+  expect(recorded[0]?.attributes['http.route']).toBeUndefined();
+  expect(recorded[0]?.status).toBeUndefined();
+  expect(recorded[0]?.ended).toBe(true);
 });

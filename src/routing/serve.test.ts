@@ -1,3 +1,6 @@
+import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { Yedra } from './app.js';
 
@@ -143,4 +146,25 @@ test('An Immutable Pattern With The Global Flag Still Matches Every File', async
   );
   await other.text();
   await context.stop();
+});
+
+test('An Unreadable Asset Is Skipped, Not Fatal', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'yedra-serve-'));
+  await writeFile(join(dir, 'good.txt'), 'fine');
+  // `readdir` lists a dangling symlink, but `stat` refuses to follow it. One
+  // such entry used to reject the whole `Promise.all`, so a single broken link
+  // anywhere under `serve.dir` failed `build()` outright.
+  await symlink(join(dir, 'nothing-here'), join(dir, 'broken.txt'));
+  const context = await new Yedra().listen(0, {
+    quiet: true,
+    serve: { dir },
+  });
+  const good = await fetch(`http://localhost:${context.port}/good.txt`);
+  expect(good.status).toBe(200);
+  expect(await good.text()).toBe('fine');
+  const broken = await fetch(`http://localhost:${context.port}/broken.txt`);
+  expect(broken.status).toBe(404);
+  await broken.text();
+  await context.stop();
+  await rm(dir, { recursive: true, force: true });
 });

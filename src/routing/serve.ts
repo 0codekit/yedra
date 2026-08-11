@@ -179,17 +179,28 @@ export class StaticAssets {
     await Promise.all(
       names.map(async (name) => {
         const absolute = join(config.dir, name);
-        if (!(await stat(absolute)).isFile()) {
-          return;
-        }
         const cacheControl = immutable?.pattern.test(name)
           ? `public, max-age=${immutable.maxAge}, immutable`
           : REVALIDATE;
+        let asset: ServeFile;
+        try {
+          if (!(await stat(absolute)).isFile()) {
+            return;
+          }
+          asset = await readAsset(absolute, cacheControl);
+        } catch (error) {
+          // One unreadable entry must not fail the whole app. `readdir` lists
+          // dangling symlinks, which `stat` refuses to follow, and anything can
+          // be deleted or have its permissions changed between the listing and
+          // the read. The rest of the directory is still perfectly servable, so
+          // the entry is skipped and reported rather than thrown.
+          if (!quiet) {
+            console.error(`yedra: skipping static asset ${absolute}:`, error);
+          }
+          return;
+        }
         // `readdir` uses the platform separator, but URLs always use `/`.
-        files.set(
-          `/${name.split(sep).join('/')}`,
-          await readAsset(absolute, cacheControl),
-        );
+        files.set(`/${name.split(sep).join('/')}`, asset);
       }),
     );
     // Serve `/index.html` for the directory root, as web servers usually do.

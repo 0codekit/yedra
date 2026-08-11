@@ -384,14 +384,19 @@ export class BuiltApp {
     return { invalidMethod, result };
   }
 
-  private matchWsRoute(
-    url: string,
-  ): { endpoint: WsEndpoint; params: Record<string, string> } | undefined {
+  private matchWsRoute(url: string):
+    | {
+        endpoint: WsEndpoint;
+        params: Record<string, string>;
+        route: string;
+      }
+    | undefined {
     let result:
       | {
           endpoint: WsEndpoint;
           params: Record<string, string>;
           score: number;
+          route: string;
         }
       | undefined;
     for (const route of this.wsRoutes) {
@@ -403,7 +408,12 @@ export class BuiltApp {
       const previous = result?.score;
       if (previous === undefined || score < previous) {
         // if there was no previous match or this one is better, use it
-        result = { endpoint: route.endpoint, params, score };
+        result = {
+          endpoint: route.endpoint,
+          params,
+          score,
+          route: route.path.toString(),
+        };
       }
     }
     return result;
