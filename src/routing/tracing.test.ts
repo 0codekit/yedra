@@ -158,7 +158,7 @@ test('Only Server Errors Mark The Span As Failed', async () => {
   expect(notFound?.attributes['http.route']).toBeUndefined();
 });
 
-test('WebSocket Spans Are Named After The Route Too', async () => {
+test('WebSocket Spans Are Named For The Connection, Not A Request', async () => {
   recorded.length = 0;
   const context = await new Yedra()
     .use(
@@ -185,15 +185,17 @@ test('WebSocket Spans Are Named After The Route Too', async () => {
 
   // every connection used to share the name `incoming_ws_connection`, so no
   // backend could group these by endpoint
-  expect(recorded[0]?.name).toBe('GET /rooms/{id}');
+  expect(recorded[0]?.name).toBe('WS /rooms/{id}');
   expect(recorded[0]?.kind).toBe(SpanKind.SERVER);
   expect(recorded[0]?.ended).toBe(true);
-  // the retired `http.url` was the only attribute this span carried
+  // `WS` and not `GET`, though a handshake is one: this span lasts as long as
+  // the connection, and a request-shaped span of arbitrary length would be
+  // folded into a backend's latency percentiles. No `http.request.method` or
+  // `http.response.status_code` either, for the same reason — they are what
+  // invites the aggregation. The retired `http.url` was all this used to carry.
   expect(recorded[0]?.attributes).toStrictEqual({
-    'http.request.method': 'GET',
     'url.path': '/rooms/42',
     'url.scheme': 'ws',
-    'http.response.status_code': 101,
     'http.route': '/rooms/{id}',
   });
   expect(recorded[0]?.status).toBeUndefined();
@@ -220,9 +222,10 @@ test('A WebSocket On No Route Is Not A Server Error', async () => {
   });
   await context.stop();
 
-  expect(recorded[0]?.name).toBe('GET');
-  expect(recorded[0]?.attributes['http.response.status_code']).toBe(404);
+  // no route matched, so there is nothing to name it after
+  expect(recorded[0]?.name).toBe('WS');
   expect(recorded[0]?.attributes['http.route']).toBeUndefined();
+  // an unknown path is the caller's mistake, not the server's
   expect(recorded[0]?.status).toBeUndefined();
   expect(recorded[0]?.ended).toBe(true);
 });

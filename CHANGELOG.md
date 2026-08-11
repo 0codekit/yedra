@@ -122,10 +122,18 @@ rejections, and a limit that did not reach every body type.
 - **WebSocket spans were named `incoming_ws_connection`, every one of them,**
   so traces could not be grouped by endpoint — the same defect the HTTP spans
   were fixed for in 0.21.0, in the one place that fix did not reach. They are
-  now named `GET {route}` and carry `http.request.method`, `url.path`,
-  `url.scheme` (`ws`/`wss`), `http.route` and `http.response.status_code`,
-  in place of the single retired `http.url` attribute. A handler that throws
-  something other than an `HttpError` sets the span status to `ERROR`.
+  now named `WS {route}` and carry `url.path`, `url.scheme` (`ws`/`wss`) and
+  `http.route`, in place of the single retired `http.url` attribute. A handler
+  that throws something other than an `HttpError` sets the span status to
+  `ERROR`.
+
+  `WS` rather than `{method} {route}`, though a handshake is literally a `GET`
+  answered with a 101: the span lasts as long as the *connection*, so a
+  request-shaped name would put a span of arbitrary length beside real
+  requests, and a backend deriving request duration from server spans would
+  fold hours of idle connection into its latency percentiles.
+  `http.request.method` and `http.response.status_code` are omitted for the
+  same reason — they are what invites that aggregation.
 - **`y.raw` and `y.stream` documented an empty Media Type Object.** The content
   type itself was right; what was missing under it was any Schema Object, so a
   generator had nothing to go on and typed the body as `any` rather than as

@@ -148,20 +148,25 @@ export const createWebSocketServer = (options: {
     const extractedContext = propagation.extract(context.active(), req.headers);
     context.with(extractedContext, () =>
       trace.getTracer('yedra').startActiveSpan(
-        // A handshake is a `GET` that is answered with a 101, so the span is
-        // named the way the HTTP ones are: the method, replaced with
-        // `{method} {route}` below once routing has resolved. Every connection
-        // sharing the single name `incoming_ws_connection` meant a backend
-        // could not group traces by endpoint, which is the whole point of
-        // naming a span.
-        'GET',
+        // `WS {route}`, filled in below once routing has resolved. Not
+        // `{method} {route}` like the HTTP spans, even though a handshake is
+        // literally a `GET` answered with a 101: this span lasts as long as the
+        // *connection*, so dressing it as a request would put a span of
+        // arbitrary length beside real requests, and any backend deriving
+        // request duration from server spans would fold hours of idle
+        // connection into its latency percentiles. The single name
+        // `incoming_ws_connection` was no better — nothing could group by
+        // endpoint — so the route is here, and only the method is not.
+        'WS',
         { kind: SpanKind.SERVER },
         async (span) => {
           const url = new URL(req.url as string, 'http://localhost');
-          // The same semantic conventions the HTTP spans use. The retired
-          // `http.url` was the only attribute here, and it is neither current
-          // nor enough to group or filter on.
-          span.setAttribute('http.request.method', 'GET');
+          // `url.path`, `url.scheme` and `http.route` are the attributes worth
+          // keeping: they say where the connection went, and are what a query
+          // groups on. `http.request.method` and `http.response.status_code`
+          // are deliberately absent, for the reason above — they are what
+          // invites a connection to be counted as a request. The retired
+          // `http.url` this replaces was neither current nor enough to group on.
           span.setAttribute('url.path', url.pathname);
           span.setAttribute(
             'url.scheme',
@@ -178,16 +183,14 @@ export const createWebSocketServer = (options: {
           ws.once('close', end);
           const match = options.matchRoute(url.pathname);
           if (match === undefined) {
-            span.setAttribute('http.response.status_code', 404);
+            // No route, so nothing to name the span after — and no error
+            // either, since an unknown path is the caller's mistake.
             ws.close(4404);
             end();
             return;
           }
-          span.updateName(`GET ${match.route}`);
+          span.updateName(`WS ${match.route}`);
           span.setAttribute('http.route', match.route);
-          // The handshake itself succeeded; a failure below is reported through
-          // the close code and the span status rather than a status line.
-          span.setAttribute('http.response.status_code', 101);
           try {
             const headers = Object.fromEntries(
               Object.entries(req.headers).map(([key, value]) => [
