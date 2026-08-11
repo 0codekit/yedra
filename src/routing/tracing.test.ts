@@ -9,6 +9,7 @@ import { afterAll, expect, test } from 'vitest';
 import { boolean, object, string } from '../lib.js';
 import { Yedra } from './app.js';
 import { Get } from './rest.js';
+import { Ws } from './websocket.js';
 
 type Recorded = {
   name: string;
@@ -155,4 +156,76 @@ test('Only Server Errors Mark The Span As Failed', async () => {
   // with no route matched there is no template to name the span after
   expect(notFound?.name).toBe('GET');
   expect(notFound?.attributes['http.route']).toBeUndefined();
+});
+
+test('WebSocket Spans Are Named For The Connection, Not A Request', async () => {
+  recorded.length = 0;
+  const context = await new Yedra()
+    .use(
+      '/rooms/:id',
+      new Ws({
+        category: 'Test',
+        summary: 'Room.',
+        params: { id: string() },
+        query: {},
+        headers: {},
+        do: (socket) => {
+          socket.close(1000);
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new WebSocket(`http://localhost:${context.port}/rooms/42`);
+  await new Promise((resolve) => {
+    ws.onclose = resolve;
+  });
+  // the client sees the close first; the span ends on the server's own event
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  await context.stop();
+
+  // every connection used to share the name `incoming_ws_connection`, so no
+  // backend could group these by endpoint
+  expect(recorded[0]?.name).toBe('WS /rooms/{id}');
+  expect(recorded[0]?.kind).toBe(SpanKind.SERVER);
+  expect(recorded[0]?.ended).toBe(true);
+  // `WS` and not `GET`, though a handshake is one: this span lasts as long as
+  // the connection, and a request-shaped span of arbitrary length would be
+  // folded into a backend's latency percentiles. No `http.request.method` or
+  // `http.response.status_code` either, for the same reason — they are what
+  // invites the aggregation. The retired `http.url` was all this used to carry.
+  expect(recorded[0]?.attributes).toStrictEqual({
+    'url.path': '/rooms/42',
+    'url.scheme': 'ws',
+    'http.route': '/rooms/{id}',
+  });
+  expect(recorded[0]?.status).toBeUndefined();
+});
+
+test('A WebSocket On No Route Is Not A Server Error', async () => {
+  recorded.length = 0;
+  const context = await new Yedra()
+    .use(
+      '/rooms/:id',
+      new Ws({
+        category: 'Test',
+        summary: 'Room.',
+        params: { id: string() },
+        query: {},
+        headers: {},
+        do: () => {},
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new WebSocket(`http://localhost:${context.port}/missing`);
+  await new Promise((resolve) => {
+    ws.onclose = resolve;
+  });
+  await context.stop();
+
+  // no route matched, so there is nothing to name it after
+  expect(recorded[0]?.name).toBe('WS');
+  expect(recorded[0]?.attributes['http.route']).toBeUndefined();
+  // an unknown path is the caller's mistake, not the server's
+  expect(recorded[0]?.status).toBeUndefined();
+  expect(recorded[0]?.ended).toBe(true);
 });

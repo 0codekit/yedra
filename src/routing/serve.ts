@@ -4,6 +4,7 @@ import { extname, join, sep } from 'node:path';
 import type { URL } from 'node:url';
 import { isUint8Array } from 'node:util/types';
 import mime from 'mime';
+import { statelessCopy } from '../validation/regex.js';
 import {
   compressAll,
   DEFAULT_COMPRESSION_THRESHOLD,
@@ -11,6 +12,7 @@ import {
   negotiateEncoding,
   precompress,
 } from './compression.js';
+import { type CorsConfig, corsHeaders, withCorsHeaders } from './cors.js';
 import { HttpError } from './errors.js';
 import { errorResponse, type Response } from './response.js';
 import type { ResponseHeaders } from './rest.js';
@@ -62,15 +64,39 @@ export type ServeConfig = {
   };
   /**
    * Extra headers added to every static file response, including `304 Not
-   * Modified` and fallback responses. Useful for e.g. CORS headers. Headers
-   * returned by a function fallback take precedence over these.
+   * Modified` and fallback responses. Headers returned by a function fallback
+   * take precedence over these.
+   *
+   * Intended for the per-response security headers a served frontend needs —
+   * `Content-Security-Policy`, `Cross-Origin-Opener-Policy`,
+   * `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`. Use
+   * `cors` for cross-origin access instead: these headers are merged in first,
+   * so a hand-written `Access-Control-*` value here cannot override the
+   * negotiated one.
    *
    * Either a fixed record applied to every static response, or a function
-   * called per request. The function receives the request URL and headers
-   * (e.g. `origin`), so it can restrict CORS to specific paths or origins;
-   * return an empty record to add nothing.
+   * called per request, which receives the request URL and headers; return an
+   * empty record to add nothing.
    */
   headers?: ServeHeaders;
+  /**
+   * Which browser origins may read these assets cross-origin, and for which
+   * paths. Without this, no CORS headers are sent.
+   *
+   * A function is called per request, so one directory can serve a few paths
+   * cross-origin and the rest same-origin — fonts and a manifest opened up
+   * while the application's own files are not. Return `undefined` for a path
+   * that should stay same-origin.
+   *
+   * ```typescript
+   * serve: {
+   *   dir: 'public',
+   *   cors: ({ pathname }) =>
+   *     pathname.startsWith('/fonts/') ? { origins: '*' } : undefined,
+   * }
+   * ```
+   */
+  cors?: CorsConfig | ((req: { pathname: string }) => CorsConfig | undefined);
   /**
    * Precompress assets with brotli, zstd and gzip, and serve whichever the
    * client accepts. Enabled by default; set to `false` to disable, or pass a
@@ -122,6 +148,7 @@ export class StaticAssets {
   private readonly files: Map<string, ServeFile>;
   private readonly fallback: ServeFallback | undefined;
   private readonly extraHeaders: ServeHeaders | undefined;
+  private readonly corsConfig: ServeConfig['cors'];
   /** Resolves once background compression has finished. Never rejects. */
   public readonly compressed: Promise<void>;
 
@@ -129,11 +156,13 @@ export class StaticAssets {
     files: Map<string, ServeFile>;
     fallback: ServeFallback | undefined;
     extraHeaders: ServeHeaders | undefined;
+    cors: ServeConfig['cors'];
     compressed: Promise<void>;
   }) {
     this.files = options.files;
     this.fallback = options.fallback;
     this.extraHeaders = options.extraHeaders;
+    this.corsConfig = options.cors;
     this.compressed = options.compressed;
   }
 
@@ -143,6 +172,7 @@ export class StaticAssets {
       files: new Map(),
       fallback: undefined,
       extraHeaders: undefined,
+      cors: undefined,
       compressed: Promise.resolve(),
     });
   }
@@ -165,28 +195,41 @@ export class StaticAssets {
     }
     // `RegExp.test` advances `lastIndex` when the pattern is global, so reusing
     // the caller's object across files would match every other one. Assets are
-    // loaded concurrently, which would make that nondeterministic.
+    // loaded concurrently, which would make that nondeterministic. Only `g` and
+    // `y` are dropped: rebuilding from `source` alone would also discard `i`,
+    // which a pattern matching file extensions may well rely on.
     const immutable =
       config.immutable === undefined
         ? undefined
         : {
-            pattern: new RegExp(config.immutable.pattern.source),
+            pattern: statelessCopy(config.immutable.pattern),
             maxAge: config.immutable.maxAge,
           };
     await Promise.all(
       names.map(async (name) => {
         const absolute = join(config.dir, name);
-        if (!(await stat(absolute)).isFile()) {
-          return;
-        }
         const cacheControl = immutable?.pattern.test(name)
           ? `public, max-age=${immutable.maxAge}, immutable`
           : REVALIDATE;
+        let asset: ServeFile;
+        try {
+          if (!(await stat(absolute)).isFile()) {
+            return;
+          }
+          asset = await readAsset(absolute, cacheControl);
+        } catch (error) {
+          // One unreadable entry must not fail the whole app. `readdir` lists
+          // dangling symlinks, which `stat` refuses to follow, and anything can
+          // be deleted or have its permissions changed between the listing and
+          // the read. The rest of the directory is still perfectly servable, so
+          // the entry is skipped and reported rather than thrown.
+          if (!quiet) {
+            console.error(`yedra: skipping static asset ${absolute}:`, error);
+          }
+          return;
+        }
         // `readdir` uses the platform separator, but URLs always use `/`.
-        files.set(
-          `/${name.split(sep).join('/')}`,
-          await readAsset(absolute, cacheControl),
-        );
+        files.set(`/${name.split(sep).join('/')}`, asset);
       }),
     );
     // Serve `/index.html` for the directory root, as web servers usually do.
@@ -204,6 +247,7 @@ export class StaticAssets {
       files,
       fallback,
       extraHeaders: config.headers,
+      cors: config.cors,
       compressed: StaticAssets.compressInBackground(
         [...files.values()],
         StaticAssets.thresholdOf(config),
@@ -272,6 +316,19 @@ export class StaticAssets {
   }
 
   /**
+   * The CORS configuration for a path, if the app declared one that covers it.
+   * Consulted for a preflight as well as for the response itself, so that both
+   * halves agree.
+   * @param pathname - The request path.
+   */
+  public cors(pathname: string): CorsConfig | undefined {
+    if (typeof this.corsConfig === 'function') {
+      return this.corsConfig({ pathname });
+    }
+    return this.corsConfig;
+  }
+
+  /**
    * Answer a `GET`, or return undefined if this path names no asset and there is
    * no fallback.
    * @param req - The request URL and headers.
@@ -286,27 +343,41 @@ export class StaticAssets {
       this.files.get(decodePath(req.url.pathname)) ??
       this.files.get(FALLBACK_KEY);
     const extra = this.resolveHeaders(req);
+    const cors = this.cors(req.url.pathname);
+    const origin = req.headers.origin;
+    // Applied last, so that an `Access-Control-*` value left over in
+    // `serve.headers` cannot override what was negotiated here.
+    const addCors = (response: Response): Response =>
+      cors === undefined
+        ? response
+        : {
+            ...response,
+            headers: withCorsHeaders(
+              response.headers,
+              corsHeaders(cors, Array.isArray(origin) ? origin[0] : origin),
+            ),
+          };
     if (file !== undefined) {
-      return StaticAssets.fileResponse(file, req.headers, extra);
+      return addCors(StaticAssets.fileResponse(file, req.headers, extra));
     }
     if (this.fallback === undefined) {
       return;
     }
     try {
       const response = await this.fallback({ href: req.url.href });
-      return {
+      return addCors({
         status: response.status ?? 200,
         body: isUint8Array(response.body)
           ? response.body
           : Buffer.from(response.body, 'utf-8'),
         headers: { ...extra, ...response.headers },
-      };
+      });
     } catch (error) {
       if (error instanceof HttpError) {
-        return errorResponse(error.status, error.message, error.code);
+        return addCors(errorResponse(error.status, error.message, error.code));
       }
       console.error(error);
-      return errorResponse(500, 'Internal Server Error.');
+      return addCors(errorResponse(500, 'Internal Server Error.'));
     }
   }
 

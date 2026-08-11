@@ -58,12 +58,23 @@ export class Path {
   }
 
   /**
-   * Returns the path as a string. The segments are joined with `/`, and the
-   * result is can be converted to a `Path` again.
+   * Returns the path in OpenAPI's template form, with parameters in braces.
+   *
+   * An optional segment loses its `?`: OpenAPI has no way to express one, and
+   * the `?` does not survive the round trip in either form. `{id?}` names a
+   * parameter called `id?`, which matches nothing the operation declares and
+   * leaves a `?` in the `operationId` built from it; a literal `def?` reads as
+   * the start of a query string. `/x/{id}` is the closest the format can come,
+   * and the shorter path the segment also matches is simply undocumented.
    * @returns The path as a string.
    */
   public toString(): string {
-    return `/${this.expected.map((segment) => (segment.startsWith(':') ? `{${segment.slice(1)}}` : segment)).join('/')}`;
+    return `/${this.expected
+      .map((segment) => {
+        const name = Path.normalizeParam(segment);
+        return segment.startsWith(':') ? `{${name}}` : name;
+      })
+      .join('/')}`;
   }
 
   /**

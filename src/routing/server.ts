@@ -1,4 +1,9 @@
-import { createServer, type Server } from 'node:http';
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from 'node:http';
 import type { WebSocketServer } from 'ws';
 import type { Counter } from '../util/counter.js';
 import type { MetricsOptions, RequestMetrics } from './metrics.js';
@@ -45,21 +50,42 @@ export const startMetricsServer = async (
   options: MetricsOptions,
 ): Promise<{ server: Server; port: number }> => {
   const server = createServer();
-  server.on('request', async (req, res) => {
-    if (req.method === 'GET' && req.url === options.path) {
-      res.writeHead(200, {
-        'content-type':
-          'text/plain; version=0.0.4; charset=utf-8; escaping=underscores',
-      });
-      res.write(metrics.render());
-      if (options.get !== undefined) {
-        res.write(await options.get());
-      }
-      res.end();
-    } else {
+  const respond = async (
+    req: IncomingMessage,
+    res: ServerResponse,
+  ): Promise<void> => {
+    if (
+      (req.method !== 'GET' && req.method !== 'HEAD') ||
+      req.url !== options.path
+    ) {
       res.writeHead(404);
       res.end('Not found');
+      return;
     }
+    // The caller's `get` is awaited before anything is written, so that a
+    // failure can still be answered with a status rather than truncating a
+    // response whose headers have already gone out.
+    const extra = options.get === undefined ? '' : await options.get();
+    const body = Buffer.from(`${metrics.render()}${extra}`, 'utf-8');
+    res.writeHead(200, {
+      'content-type':
+        'text/plain; version=0.0.4; charset=utf-8; escaping=underscores',
+      'content-length': String(body.byteLength),
+    });
+    res.end(req.method === 'HEAD' ? undefined : body);
+  };
+  server.on('request', (req, res) => {
+    // Without this the handler's rejection is unhandled, which by default takes
+    // the process down — and the response is never ended either, so the scrape
+    // hangs until the client times out. A metrics endpoint must not be able to
+    // do either of those things.
+    respond(req, res).catch((error: unknown) => {
+      console.error(error);
+      if (!res.headersSent) {
+        res.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+      }
+      res.end('Failed to collect metrics\n');
+    });
   });
   return { server, port: await listenOn(server, options.port) };
 };

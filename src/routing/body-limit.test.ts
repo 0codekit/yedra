@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { number, object, raw, string } from '../lib.js';
+import { number, object, raw, stream, string } from '../lib.js';
 import { Yedra } from './app.js';
 import { Post } from './rest.js';
 
@@ -150,5 +150,55 @@ test('The Limit Can Be Disabled', async () => {
   );
   expect(response.status).toBe(200);
   expect(await response.json()).toStrictEqual({ length: 50_000 });
+  await context.stop();
+});
+
+test('An Oversized Streamed Body Is A 413, Not A 500', async () => {
+  const context = await new Yedra()
+    .use(
+      '/stream',
+      new Post({
+        category: 'Test',
+        summary: 'Count the bytes of a streamed body.',
+        maxBodySize: 100,
+        params: {},
+        query: {},
+        headers: {},
+        req: stream(),
+        res: object({ size: number() }),
+        async do(req) {
+          let size = 0;
+          const reader = req.body.getReader();
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
+            size += (value as Uint8Array).length;
+          }
+          return { body: { size } };
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  const send = (bytes: number) =>
+    // Sent without a Content-Length, so the limit can only be enforced as the
+    // body arrives — which for a stream happens inside the endpoint, after
+    // `deserialize` has already handed the stream over.
+    fetch(`http://localhost:${context.port}/stream`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/octet-stream' },
+      body: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new Uint8Array(bytes));
+          controller.close();
+        },
+      }),
+      duplex: 'half',
+    } as RequestInit);
+  expect((await send(50)).status).toBe(200);
+  const tooLarge = await send(4000);
+  expect(tooLarge.status).toBe(413);
+  expect(await tooLarge.json()).toMatchObject({ code: 'content_too_large' });
   await context.stop();
 });

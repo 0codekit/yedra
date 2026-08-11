@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import { binaryDocs } from './binary.js';
 import { BodyType } from './body.js';
 import { mediaType } from './content-type.js';
 
@@ -35,7 +36,7 @@ class StreamBody extends BodyType<ReadableStream, ReadableStream> {
 
   public bodyDocs(): object {
     return {
-      [this.contentType]: {},
+      [this.contentType]: { schema: binaryDocs(this.contentType) },
     };
   }
 }

@@ -69,3 +69,45 @@ test('WebSocket', async () => {
   expect(code).toBe(1000);
   expect(reason).toBe('Server Shutdown');
 });
+
+test('events that arrive before a handler is registered are not lost', async () => {
+  const seen: string[] = [];
+  let finished: () => void = () => {};
+  const done = new Promise<void>((resolve) => {
+    finished = resolve;
+  });
+  const context = await new Yedra()
+    .use(
+      '/late',
+      new Ws({
+        category: 'Test',
+        summary: 'Registers its handlers after an await.',
+        params: {},
+        query: {},
+        headers: {},
+        async do(socket) {
+          // A handler is commonly registered after an await — a session lookup,
+          // say. Messages were queued across that window but `close` was not,
+          // so an endpoint could wait forever for a socket already gone.
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          socket.on('message', (data) => {
+            seen.push(`message:${data.toString('utf-8')}`);
+          });
+          socket.on('close', () => {
+            seen.push('close');
+            finished();
+          });
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new WebSocket(`http://localhost:${context.port}/late`);
+  await new Promise((resolve) => {
+    ws.onopen = resolve;
+  });
+  ws.send('hello');
+  ws.close();
+  await done;
+  expect(seen).toEqual(['message:hello', 'close']);
+  await context.stop();
+});

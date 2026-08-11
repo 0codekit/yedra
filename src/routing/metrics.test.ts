@@ -122,3 +122,53 @@ test('Metrics Are Well Formed', async () => {
   }
   await context.stop();
 });
+
+test('a failing extra metrics collector is answered, not crashed on', async () => {
+  const context = await new Yedra().listen(0, {
+    quiet: true,
+    metrics: {
+      port: 0,
+      path: '/metrics',
+      get: () => Promise.reject(new Error('collector unavailable')),
+    },
+  });
+  const rejections: unknown[] = [];
+  const onRejection = (error: unknown): void => {
+    rejections.push(error);
+  };
+  process.on('unhandledRejection', onRejection);
+  try {
+    // The handler used to be an un-caught async listener, so a rejecting `get`
+    // became an unhandled rejection — fatal by default — and left the response
+    // unfinished, hanging the scrape until the client gave up.
+    const response = await fetch(
+      `http://localhost:${context.metricsPort}/metrics`,
+      { signal: AbortSignal.timeout(2000) },
+    );
+    await response.text();
+    expect(response.status).toBe(500);
+  } finally {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    process.off('unhandledRejection', onRejection);
+    await context.stop();
+  }
+  expect(rejections).toHaveLength(0);
+});
+
+test('metrics answer HEAD with the headers of a GET and no body', async () => {
+  const context = await new Yedra().listen(0, {
+    quiet: true,
+    metrics: { port: 0, path: '/metrics' },
+  });
+  const url = `http://localhost:${context.metricsPort}/metrics`;
+  const get = await fetch(url);
+  const body = await get.text();
+  const head = await fetch(url, { method: 'HEAD' });
+  expect(head.status).toBe(200);
+  expect(await head.text()).toBe('');
+  expect(get.headers.get('content-length')).toBe(String(body.length));
+  expect(head.headers.get('content-length')).toBe(
+    get.headers.get('content-length'),
+  );
+  await context.stop();
+});

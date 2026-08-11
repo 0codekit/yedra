@@ -101,6 +101,14 @@ export const writeResponse = async (
     payload = Buffer.from(JSON.stringify(response.body), 'utf-8');
     headers['content-type'] ??= 'application/json';
   }
+  // A response with no `Cache-Control` and no `Expires` is *heuristically*
+  // cacheable: RFC 9111 lets a shared cache invent a freshness lifetime for a
+  // cacheable status on a GET. For an API that is the wrong default — a
+  // cookie-authenticated `GET /me` behind a CDN could be stored and handed to
+  // the next caller, since only the `Authorization` header triggers the rule
+  // that keeps shared caches off an authenticated response. Static assets set
+  // their own value and keep it; an endpoint that wants to be cached says so.
+  headers['cache-control'] ??= 'no-store';
   if (!(payload instanceof ReadableStream) && !BODILESS_STATUSES.has(status)) {
     // The length is only knowable up front for a buffered body — and where it is
     // knowable it is authoritative, so it overrides rather than fills in. A
@@ -133,8 +141,25 @@ export const writeResponse = async (
     for await (const chunk of payload) {
       const canContinue = res.write(chunk);
       if (!canContinue) {
-        // Buffer full - wait for drain before continuing
-        await new Promise<void>((resolve) => res.once('drain', resolve));
+        // Buffer full — wait for drain before continuing. `close` and `error`
+        // are waited on too: a client that disconnects mid-stream never drains,
+        // and waiting on `drain` alone would leave this loop, the response and
+        // whatever the source stream holds open for the life of the process.
+        await new Promise<void>((resolve) => {
+          const done = (): void => {
+            res.off('drain', done);
+            res.off('close', done);
+            res.off('error', done);
+            resolve();
+          };
+          res.once('drain', done);
+          res.once('close', done);
+          res.once('error', done);
+        });
+        if (res.writableEnded || res.destroyed) {
+          // the socket went away while waiting
+          return;
+        }
       }
     }
   } catch {

@@ -111,3 +111,67 @@ test('A Buffered Response Carries Its Content-Length', async () => {
   await response.arrayBuffer();
   await context.stop();
 });
+
+test('Dynamic Responses Default To no-store', async () => {
+  const context = await new Yedra()
+    .use(
+      '/me',
+      new Get({
+        category: 'Test',
+        summary: 'Private data.',
+        params: {},
+        query: {},
+        headers: {},
+        res: object({ name: string() }),
+        do: () => ({ body: { name: 'justus' } }),
+      }),
+    )
+    .use(
+      '/cacheable',
+      new Get({
+        category: 'Test',
+        summary: 'Says so itself.',
+        params: {},
+        query: {},
+        headers: {},
+        res: object({ name: string() }),
+        do: () => ({
+          body: { name: 'public' },
+          headers: { 'cache-control': 'public, max-age=60' },
+        }),
+      }),
+    )
+    .listen(0, { quiet: true });
+
+  // Without this a shared cache may invent a freshness lifetime and hand one
+  // caller's private response to the next — cookie auth gets none of the
+  // protection RFC 9111 gives an `Authorization`-bearing request.
+  const me = await fetch(`http://localhost:${context.port}/me`);
+  await me.text();
+  expect(me.headers.get('cache-control')).toBe('no-store');
+
+  // an endpoint that wants to be cached still decides for itself
+  const cacheable = await fetch(`http://localhost:${context.port}/cacheable`);
+  await cacheable.text();
+  expect(cacheable.headers.get('cache-control')).toBe('public, max-age=60');
+
+  // errors too
+  const missing = await fetch(`http://localhost:${context.port}/nope`);
+  await missing.text();
+  expect(missing.headers.get('cache-control')).toBe('no-store');
+
+  await context.stop();
+});
+
+test('Static Assets Keep Their Own Cache-Control', async () => {
+  const context = await new Yedra().listen(0, {
+    quiet: true,
+    serve: { dir: 'test/static' },
+  });
+  const response = await fetch(`http://localhost:${context.port}/hello.txt`);
+  await response.text();
+  expect(response.headers.get('cache-control')).toBe(
+    'public, max-age=0, must-revalidate',
+  );
+  await context.stop();
+});

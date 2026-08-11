@@ -7,6 +7,7 @@ import { Issue, ValidationError } from '../validation/error.js';
 import { NoneBody, none } from '../validation/none.js';
 import { laxObject, type ObjectSchema, object } from '../validation/object.js';
 import type { Schema } from '../validation/schema.js';
+import type { CorsConfig } from './cors.js';
 import { BadRequestError, PayloadTooLargeError } from './errors.js';
 
 type ReqObject<Params, Query, Headers, Body> = {
@@ -63,6 +64,16 @@ type EndpointOptions<
    * app-wide `maxBodySize`. Use `Number.POSITIVE_INFINITY` for no limit.
    */
   maxBodySize?: number;
+  /**
+   * Which browser origins may call this endpoint cross-origin. Without this,
+   * no CORS headers are sent and a browser on another origin cannot read the
+   * response.
+   *
+   * Declared per endpoint rather than per app, so that opening one route up
+   * does not quietly open the rest. A preflight names the method it is asking
+   * about, so yedra answers it from that method's endpoint.
+   */
+  cors?: CorsConfig;
   params: Params;
   query: Query;
   headers: Headers;
@@ -95,6 +106,8 @@ const ERROR_BODY_DOCS = {
 
 export abstract class RestEndpoint {
   public abstract get method(): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  /** The endpoint's CORS configuration, if it declared one. */
+  public abstract get cors(): CorsConfig | undefined;
   public abstract handle(req: {
     url: string;
     body: Readable;
@@ -148,6 +161,10 @@ class ConcreteRestEndpoint<
 
   public get method(): 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' {
     return this._method;
+  }
+
+  public get cors(): CorsConfig | undefined {
+    return this.options.cors;
   }
 
   public async handle(req: {
@@ -225,15 +242,30 @@ class ConcreteRestEndpoint<
     }
     // Reaching here means nothing pushed an issue, so every part above parsed
     // successfully. `body` is genuinely undefined for endpoints without one.
-    return await this.options.do({
-      url: req.url,
-      method: this._method,
-      params: parsedParams as Typeof<ObjectSchema<Params>>,
-      query: parsedQuery as Typeof<ObjectSchema<Query>>,
-      headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
-      rawHeaders: req.headers,
-      body: parsedBody as Typeof<Req>,
-    });
+    try {
+      return await this.options.do({
+        url: req.url,
+        method: this._method,
+        params: parsedParams as Typeof<ObjectSchema<Params>>,
+        query: parsedQuery as Typeof<ObjectSchema<Query>>,
+        headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
+        rawHeaders: req.headers,
+        body: parsedBody as Typeof<Req>,
+      });
+    } catch (error) {
+      if (error instanceof BodySizeExceededError) {
+        // A `y.stream()` body is handed over before it has been read, so the
+        // limit is only reached once the endpoint pulls from the stream — after
+        // `deserialize` returned. Without this the same oversized upload that
+        // any other body type answers with a 413 becomes a 500.
+        throw new PayloadTooLargeError(
+          `Request body exceeds the maximum of ${maxBodySize} bytes.`,
+          undefined,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
   }
 
   public isHidden(): boolean {

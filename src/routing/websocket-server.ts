@@ -1,6 +1,12 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { URL } from 'node:url';
-import { context, propagation, SpanKind, trace } from '@opentelemetry/api';
+import {
+  context,
+  propagation,
+  SpanKind,
+  SpanStatusCode,
+  trace,
+} from '@opentelemetry/api';
 import { WebSocketServer } from 'ws';
 import { HttpError } from './errors.js';
 import type { WsEndpoint } from './websocket.js';
@@ -93,6 +99,8 @@ const originAllowed = (
 type WsMatch = {
   endpoint: WsEndpoint;
   params: Record<string, string>;
+  /** The matched route template, e.g. `/rooms/{id}`. */
+  route: string;
 };
 
 /**
@@ -139,47 +147,73 @@ export const createWebSocketServer = (options: {
     ws.on('error', logSocketError);
     const extractedContext = propagation.extract(context.active(), req.headers);
     context.with(extractedContext, () =>
-      trace
-        .getTracer('yedra')
-        .startActiveSpan(
-          'incoming_ws_connection',
-          { kind: SpanKind.SERVER },
-          async (span) => {
-            span.setAttribute('http.url', req.url ?? 'UNKNOWN');
-            let ended = false;
-            const end = () => {
-              if (ended) {
-                return;
-              }
-              ended = true;
-              span.end();
-            };
-            ws.once('close', end);
-            const url = new URL(req.url as string, 'http://localhost');
-            const match = options.matchRoute(url.pathname);
-            if (match === undefined) {
-              ws.close(4404);
-              end();
+      trace.getTracer('yedra').startActiveSpan(
+        // `WS {route}`, filled in below once routing has resolved. Not
+        // `{method} {route}` like the HTTP spans, even though a handshake is
+        // literally a `GET` answered with a 101: this span lasts as long as the
+        // *connection*, so dressing it as a request would put a span of
+        // arbitrary length beside real requests, and any backend deriving
+        // request duration from server spans would fold hours of idle
+        // connection into its latency percentiles. The single name
+        // `incoming_ws_connection` was no better — nothing could group by
+        // endpoint — so the route is here, and only the method is not.
+        'WS',
+        { kind: SpanKind.SERVER },
+        async (span) => {
+          const url = new URL(req.url as string, 'http://localhost');
+          // `url.path`, `url.scheme` and `http.route` are the attributes worth
+          // keeping: they say where the connection went, and are what a query
+          // groups on. `http.request.method` and `http.response.status_code`
+          // are deliberately absent, for the reason above — they are what
+          // invites a connection to be counted as a request. The retired
+          // `http.url` this replaces was neither current nor enough to group on.
+          span.setAttribute('url.path', url.pathname);
+          span.setAttribute(
+            'url.scheme',
+            'encrypted' in req.socket ? 'wss' : 'ws',
+          );
+          let ended = false;
+          const end = (): void => {
+            if (ended) {
               return;
             }
-            try {
-              const headers = Object.fromEntries(
-                Object.entries(req.headers).map(([key, value]) => [
-                  key,
-                  Array.isArray(value) ? value.join(',') : (value ?? ''),
-                ]),
-              );
-              await match.endpoint.handle(url, match.params, headers, ws);
-            } catch (error) {
-              if (error instanceof HttpError) {
-                ws.close(4000 + error.status, error.message);
-              } else {
-                console.error(error);
-                ws.close(1011, 'Internal Error');
-              }
+            ended = true;
+            span.end();
+          };
+          ws.once('close', end);
+          const match = options.matchRoute(url.pathname);
+          if (match === undefined) {
+            // No route, so nothing to name the span after — and no error
+            // either, since an unknown path is the caller's mistake.
+            ws.close(4404);
+            end();
+            return;
+          }
+          span.updateName(`WS ${match.route}`);
+          span.setAttribute('http.route', match.route);
+          try {
+            const headers = Object.fromEntries(
+              Object.entries(req.headers).map(([key, value]) => [
+                key,
+                Array.isArray(value) ? value.join(',') : (value ?? ''),
+              ]),
+            );
+            await match.endpoint.handle(url, match.params, headers, ws);
+          } catch (error) {
+            if (error instanceof HttpError) {
+              // The caller's fault, like a 4xx, so not the server's error.
+              ws.close(4000 + error.status, error.message);
+            } else {
+              console.error(error);
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: error instanceof Error ? error.message : undefined,
+              });
+              ws.close(1011, 'Internal Error');
             }
-          },
-        ),
+          }
+        },
+      ),
     );
   });
   return wss;

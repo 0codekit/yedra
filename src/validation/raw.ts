@@ -1,5 +1,6 @@
 import type { Readable } from 'node:stream';
 import { readableToBuffer } from '../util/stream.js';
+import { binaryDocs } from './binary.js';
 import { BodyType } from './body.js';
 import { mediaType } from './content-type.js';
 
@@ -31,7 +32,7 @@ class RawBody extends BodyType<Buffer<ArrayBuffer>, Buffer<ArrayBufferLike>> {
 
   public bodyDocs(): object {
     return {
-      [this.contentType]: {},
+      [this.contentType]: { schema: binaryDocs(this.contentType) },
     };
   }
 }

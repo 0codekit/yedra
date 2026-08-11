@@ -1,5 +1,6 @@
 import { Issue, ValidationError } from './error.js';
 import { ModifiableSchema } from './modifiable.js';
+import { statelessCopy } from './regex.js';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -46,11 +47,17 @@ class StringSchema extends ModifiableSchema<string> {
 
   /**
    * Require the string to match the specified pattern.
+   *
+   * The pattern is copied without its `g` and `y` flags: `RegExp.test` advances
+   * `lastIndex` on a sticky or global pattern, so reusing the caller's object
+   * across values would make every other parse fail. The remaining flags are
+   * kept, since they change what the pattern means.
    * @param pattern - A regular expression.
    */
   public pattern(pattern: RegExp): this {
+    const stateless = statelessCopy(pattern);
     return this.refine(
-      (s) => pattern.test(s) || `Does not match pattern /${pattern.source}/`,
+      (s) => stateless.test(s) || `Does not match pattern /${pattern.source}/`,
       { pattern: pattern.source },
     );
   }

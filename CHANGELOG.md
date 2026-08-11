@@ -6,6 +6,175 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While yedra is below 1.0.0, breaking changes may land in minor releases.
 
+## [0.21.1] - 2026-08-11
+
+CORS, and follow-up fixes to 0.21.0 — the latter all in the same classes of bug
+that release set out to remove: stateful regular expressions, unhandled
+rejections, and a limit that did not reach every body type.
+
+### Added
+
+- **`cors` on every endpoint**, and `serve.cors` for static assets. 0.21.0
+  started answering `OPTIONS` but gave no way to put anything on the response
+  except `Allow`, so a preflight could never be satisfied — which meant no
+  cross-origin request beyond a "simple" one worked at all: no JSON body, no
+  `Authorization`, no custom header.
+
+  ```typescript
+  new Post({
+    cors: {
+      origins: ['https://app.example.com'],
+      headers: ['authorization', 'content-type'],
+      credentials: true,
+      maxAge: 600,
+    },
+    // …
+  })
+  ```
+
+  Configured per endpoint rather than per app, so opening one route does not
+  quietly open the rest. Each field is one `Access-Control-*` header and means
+  what that header means: `origins` is `Allow-Origin`, `headers` is
+  `Allow-Headers` (what a browser may send), `expose` is `Expose-Headers` (what
+  JavaScript may read), `credentials` is `Allow-Credentials`, and `maxAge` is
+  `Max-Age`. `origins` additionally takes a list or a predicate, the way
+  `websocket.origins` does, since a header has no spelling for those.
+
+  `headers` and `expose` take `'*'` as well as a list, because those headers
+  do — yedra passes the wildcard through rather than making you enumerate, and
+  rather than inventing an echo of `Access-Control-Request-Headers`. Worth
+  knowing that the CORS safelist is narrower than it looks: `content-type` is
+  safelisted only for form and plain-text values, so a cross-origin JSON
+  request needs `headers: ['content-type']` or `headers: '*'`.
+
+  A preflight carries `Access-Control-Request-Method`, naming exactly one
+  method, so it is answered from *that* method's endpoint — which is what lets
+  `GET` and `POST` on one path hold different policies. `Access-Control-Allow-
+  Methods` names only the method asked about, since listing the others would
+  claim they accept this origin when their own configuration may not.
+
+  The headers go on the real response as well as the preflight, failures
+  included: without `Access-Control-Allow-Origin` a browser hides the status
+  from JavaScript, so a cross-origin caller sees an opaque network error rather
+  than the 400 or 413 it was sent.
+
+  **`credentials: true` rules out `'*'` anywhere** — `origins`, `headers` or
+  `expose` — and the type enforces it. That is the specification's own rule
+  rather than yedra's: `*` is a wildcard in an uncredentialed response and the
+  literal character `*` in a credentialed one, where it therefore matches
+  nothing. `Allow-Origin: *` is refused outright there, and reflecting whatever
+  `Origin` arrived instead would defeat that check rather than honour it —
+  "any site may act as the logged-in user and read the result" is almost never
+  meant. `origins: () => true` says it explicitly where it really is, the same
+  spelling `websocket.origins` uses.
+
+  Note that an `Authorization` header the caller sets itself is *not* what
+  `credentials` covers — that is the browser's ambient credentials, cookies and
+  HTTP authentication. A bearer token is an ordinary header, belongs in
+  `headers`, and works with `origins: '*'`.
+
+  `Vary: Origin` is set whenever the answer depends on the request's origin,
+  and appended to the `Vary: Accept-Encoding` a static asset already carries
+  rather than replacing it. Only `'*'` is exempt, being the one configuration
+  whose answer is a constant — a list of exactly one origin still varies,
+  because the *presence* of the header differs even where its value cannot.
+
+  `serve.cors` may be a function of the path, so one directory can serve fonts
+  cross-origin while the application's own files stay same-origin.
+
+### Changed
+
+- **Dynamic responses default to `Cache-Control: no-store`.** A response with
+  no `Cache-Control` and no `Expires` is *heuristically* cacheable: RFC 9111
+  lets a shared cache invent a freshness lifetime for a cacheable status on a
+  `GET`. yedra set the header only on static files, so a cookie-authenticated
+  `GET /me` behind a CDN could be stored and handed to the next caller —
+  only the `Authorization` header triggers the rule that keeps shared caches
+  off an authenticated response, and cookie auth does not. An endpoint that
+  returns its own `Cache-Control` still decides for itself, and static assets
+  keep theirs.
+- **`serve.headers` is documented as what it is**: the per-response security
+  headers a served frontend needs — `Content-Security-Policy`,
+  `Cross-Origin-Opener-Policy`, `X-Content-Type-Options`, `Referrer-Policy`,
+  `Permissions-Policy`. It was introduced for CORS, which `serve.cors` now
+  covers properly. The option is unchanged and still supported; it is merged
+  before the CORS headers, so a leftover `Access-Control-*` value cannot
+  override a negotiated one.
+
+### Fixed
+
+- **A `RegExp` with the `g` or `y` flag passed to `.pattern()` rejected every
+  other value.** `RegExp.test` advances `lastIndex` on a global or sticky
+  pattern and resumes from there, so `y.string().pattern(/[a-z]+/g)` accepted
+  `'abc'`, rejected the next `'abc'`, and so on — the same mistake that
+  `serve.immutable.pattern` was fixed for in 0.21.0. Both now go through one
+  helper that drops `g` and `y` and keeps every other flag. `serve.immutable`
+  rebuilt the pattern from `source` alone, so it was also silently discarding
+  `i`.
+- **A failing extra metrics collector took the process down.** The metrics
+  server's request handler was an `async` listener that nothing caught, so a
+  `metrics.get` that rejected became an unhandled rejection — fatal under
+  Node's default — and left the response unfinished, hanging the scrape until
+  the client gave up. The collector is now awaited before anything is written,
+  a failure is answered with a 500, and the endpoint answers `HEAD` and sets
+  `Content-Length`.
+- **A WebSocket handler registered after an `await` missed `close` and
+  `error`.** Messages were queued across that window but the other two events
+  were dropped, so an endpoint that looked up a session before subscribing
+  could wait forever for a socket that had already gone. All three events are
+  queued until the first handler for them is registered.
+- **An oversized `y.stream()` body was answered with a 500 rather than a 413.**
+  A streamed body is handed to the endpoint before it is read, so the limit is
+  only reached once the endpoint pulls from the stream — after `deserialize`
+  returned, and past the point that mapped the failure onto a status. A
+  `BodySizeExceededError` that comes back out of the endpoint is now a 413,
+  which covers the endpoint that simply reads its stream. An endpoint that
+  catches its own read errors still owns the outcome, as it should: unlike a
+  buffered body, yedra does not do the reading and cannot answer for it. Only
+  bodies that understate their length or send none at all reach this path at
+  all; a truthful `Content-Length` is still refused up front.
+- **WebSocket spans were named `incoming_ws_connection`, every one of them,**
+  so traces could not be grouped by endpoint — the same defect the HTTP spans
+  were fixed for in 0.21.0, in the one place that fix did not reach. They are
+  now named `WS {route}` and carry `url.path`, `url.scheme` (`ws`/`wss`) and
+  `http.route`, in place of the single retired `http.url` attribute. A handler
+  that throws something other than an `HttpError` sets the span status to
+  `ERROR`.
+
+  `WS` rather than `{method} {route}`, though a handshake is literally a `GET`
+  answered with a 101: the span lasts as long as the *connection*, so a
+  request-shaped name would put a span of arbitrary length beside real
+  requests, and a backend deriving request duration from server spans would
+  fold hours of idle connection into its latency percentiles.
+  `http.request.method` and `http.response.status_code` are omitted for the
+  same reason — they are what invites that aggregation.
+- **`y.raw` and `y.stream` documented an empty Media Type Object.** The content
+  type itself was right; what was missing under it was any Schema Object, so a
+  generator had nothing to go on and typed the body as `any` rather than as
+  bytes. They now emit `type: 'string'` with `contentMediaType` — the OpenAPI
+  3.1 spelling of what 3.0 wrote as `format: 'binary'`.
+- **One unreadable file under `serve.dir` failed `build()` outright.** Assets
+  are loaded with `Promise.all`, so a single rejection took the whole app down:
+  `readdir` lists dangling symlinks, which `stat` refuses to follow, and any
+  file can be deleted or have its permissions changed between the listing and
+  the read. Such an entry is now skipped and reported, and the rest of the
+  directory is served.
+- **A 405 for a method yedra does not route at all carried no `Allow`
+  header**, which RFC 9110 requires on every 405. A known method on the wrong
+  route already sent one.
+- **A client that disconnected mid-stream left the response waiting for a
+  `drain` that never came**, holding the response and the source stream open
+  for the life of the process. `close` and `error` end the wait too.
+
+### Changed
+
+- **An optional path segment is documented without its `?`.** `/x/:id?`
+  produced the path template `/x/{id?}`, which names a parameter called `id?`
+  that the operation never declares, and put a `?` into the `operationId` built
+  from it; an optional literal produced `/x/def?`, which reads as the start of
+  a query string. Both are now documented as the path with the segment
+  present, which is as close as OpenAPI can get. Matching is unchanged.
+
 ## [0.21.0] - 2026-08-10
 
 A large renovation release. Every constraint in the schema library is now built
@@ -436,4 +605,5 @@ behaviour without a compile error. Anything generating clients from
 - The `onmessage` and `onclose` setters on `YedraWebSocket`, replaced by `on`.
 - The `uuid` runtime dependency.
 
+[0.21.1]: https://github.com/0codekit/yedra/releases/tag/v0.21.1
 [0.21.0]: https://github.com/0codekit/yedra/releases/tag/v0.21.0

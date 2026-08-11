@@ -87,7 +87,9 @@ test('Path With Prefix And Parameter', () => {
 
 test('Path With Optional Segment', () => {
   const path = new Path('/abc/def?');
-  expect(path.toString()).toStrictEqual('/abc/def?');
+  // The `?` is dropped: OpenAPI cannot express an optional segment, and a
+  // literal `def?` in a path template reads as the start of a query string.
+  expect(path.toString()).toStrictEqual('/abc/def');
   expect(path.match('/abc')).toStrictEqual({
     params: {},
     score: 0,
@@ -102,7 +104,9 @@ test('Path With Optional Segment', () => {
 
 test('Path With Optional Parameter', () => {
   const path = new Path('/abc/:id?');
-  expect(path.toString()).toStrictEqual('/abc/{id?}');
+  // `{id?}` is not a valid path template — it names a parameter called `id?`,
+  // which no operation declares, and puts a `?` in the generated operationId.
+  expect(path.toString()).toStrictEqual('/abc/{id}');
   expect(path.match('/abc')).toStrictEqual({
     params: {},
     score: 0,
