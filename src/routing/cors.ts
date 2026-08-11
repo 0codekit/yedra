@@ -61,6 +61,13 @@ export type CorsConfig = CorsBase &
          * `fetch(url, { credentials: 'include' })` — not an `Authorization`
          * header the caller sets itself, which is an ordinary header and belongs
          * in `headers`.
+         *
+         * Beside a predicate that accepts every origin this switches off the
+         * same-origin policy for the endpoint: any page the user visits can
+         * then call it as them and read the answer. That is what `'*'` is
+         * forbidden to express, and writing it as `origins: () => true` does
+         * not make it safer — only deliberate. Name the origins instead
+         * wherever you can.
          */
         credentials?: boolean;
       }
