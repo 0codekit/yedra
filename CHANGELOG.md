@@ -33,10 +33,19 @@ rejections, and a limit that did not reach every body type.
   ```
 
   Configured per endpoint rather than per app, so opening one route does not
-  quietly open the rest. `origins` takes `'*'`, a list, or a predicate, the way
-  `websocket.origins` does. `headers` lists what a browser may send, `expose`
-  what JavaScript may read, and `maxAge` how long a preflight result may be
-  reused.
+  quietly open the rest. Each field is one `Access-Control-*` header and means
+  what that header means: `origins` is `Allow-Origin`, `headers` is
+  `Allow-Headers` (what a browser may send), `expose` is `Expose-Headers` (what
+  JavaScript may read), `credentials` is `Allow-Credentials`, and `maxAge` is
+  `Max-Age`. `origins` additionally takes a list or a predicate, the way
+  `websocket.origins` does, since a header has no spelling for those.
+
+  `headers` and `expose` take `'*'` as well as a list, because those headers
+  do — yedra passes the wildcard through rather than making you enumerate, and
+  rather than inventing an echo of `Access-Control-Request-Headers`. Worth
+  knowing that the CORS safelist is narrower than it looks: `content-type` is
+  safelisted only for form and plain-text values, so a cross-origin JSON
+  request needs `headers: ['content-type']` or `headers: '*'`.
 
   A preflight carries `Access-Control-Request-Method`, naming exactly one
   method, so it is answered from *that* method's endpoint — which is what lets
@@ -49,15 +58,20 @@ rejections, and a limit that did not reach every body type.
   from JavaScript, so a cross-origin caller sees an opaque network error rather
   than the 400 or 413 it was sent.
 
-  `origins: '*'` cannot be combined with `credentials`, and the type refuses
-  it rather than reflecting whatever `Origin` arrived: the CORS specification
-  forbids the wildcard for a credentialed request precisely because "any site
-  may act as the logged-in user and read the result" is almost never meant, and
-  echoing the caller's origin would defeat that check rather than honour it.
-  `origins: () => true` says it explicitly where it really is meant, the same
-  spelling `websocket.origins` uses. Note that an `Authorization` header the
-  caller sets itself is *not* what `credentials` covers — it is an ordinary
-  header, belongs in `headers`, and works with `origins: '*'`.
+  **`credentials: true` rules out `'*'` anywhere** — `origins`, `headers` or
+  `expose` — and the type enforces it. That is the specification's own rule
+  rather than yedra's: `*` is a wildcard in an uncredentialed response and the
+  literal character `*` in a credentialed one, where it therefore matches
+  nothing. `Allow-Origin: *` is refused outright there, and reflecting whatever
+  `Origin` arrived instead would defeat that check rather than honour it —
+  "any site may act as the logged-in user and read the result" is almost never
+  meant. `origins: () => true` says it explicitly where it really is, the same
+  spelling `websocket.origins` uses.
+
+  Note that an `Authorization` header the caller sets itself is *not* what
+  `credentials` covers — that is the browser's ambient credentials, cookies and
+  HTTP authentication. A bearer token is an ordinary header, belongs in
+  `headers`, and works with `origins: '*'`.
 
   `Vary: Origin` is set whenever the answer depends on the request's origin,
   and appended to the `Vary: Accept-Encoding` a static asset already carries

@@ -1,75 +1,100 @@
 import type { ResponseHeaders } from './rest.js';
 
-/**
- * Which browser origins may read a response, and what a browser is allowed to
- * send in order to get it.
- *
- * yedra derives the preflight answer from this rather than taking a bag of
- * headers, because the correct answer is not a constant: `Vary` depends on
- * whether the allowed origin is computed from the request, `*` is illegal once
- * credentials are involved, and the methods a preflight may be told about
- * depend on the method it asked about.
- */
+/** The fields that mean the same thing whether or not credentials are sent. */
 type CorsBase = {
   /**
-   * The request headers a browser may send. Anything beyond the CORS-safelisted
-   * ones has to be listed here, `content-type: application/json` and
-   * `authorization` included — a preflight asking for a header that is not
-   * listed is refused.
-   *
-   * Note that an `Authorization` header the caller sets itself, a bearer token
-   * for instance, is an ordinary header as far as CORS is concerned: list it
-   * here and it works, `origins: '*'` included. It is not what `credentials`
-   * means.
+   * How long, in seconds, a browser may reuse a preflight result, sent as
+   * `Access-Control-Max-Age`. Browsers cap it — around two hours in Chromium —
+   * and the cache is keyed by origin, URL and method, so it saves a round trip
+   * per URL rather than per route.
    */
-  headers?: string[];
-  /**
-   * The response headers JavaScript may read. Only a short safelist is readable
-   * without this, so a header the caller is meant to see — `x-request-id`, a
-   * pagination total — has to be named.
-   */
-  expose?: string[];
-  /** How long, in seconds, a browser may reuse a preflight result. */
   maxAge?: number;
 };
 
+/**
+ * Which browser origins may read a response, and what a browser may send to get
+ * it. Each field is one `Access-Control-*` header, and means what that header
+ * means.
+ *
+ * The two shapes are the specification's own rule, not an invention of yedra's:
+ * `*` is a wildcard in an uncredentialed response and the literal character `*`
+ * in a credentialed one, where it therefore matches nothing. So a config with
+ * `credentials: true` may not use `*` anywhere — `origins`, `headers` or
+ * `expose` — and has to name what it allows.
+ */
 export type CorsConfig = CorsBase &
   (
     | {
-        /** Every origin may read the response. */
-        origins: '*';
         /**
-         * Not available alongside `origins: '*'`. The CORS specification
-         * refuses the wildcard for a credentialed request precisely because
-         * "any site may act as the logged-in user and read the result" is
-         * almost never what someone means, and answering it by reflecting
-         * whatever `Origin` arrived would defeat that check rather than honour
-         * it. Say `origins: () => true` if it really is what you mean.
+         * `Access-Control-Allow-Origin`. `'*'` is sent verbatim and answers
+         * every request, including one with no `Origin` at all. A list or a
+         * predicate answers an allowed origin with itself, and sends nothing to
+         * anyone else.
+         */
+        origins: '*' | string[] | ((origin: string) => boolean);
+        /**
+         * `Access-Control-Allow-Headers`: the request headers a browser may
+         * send. `'*'` allows any; a list allows exactly those.
+         *
+         * The CORS safelist is narrower than it looks — `content-type` is
+         * safelisted only for form and plain-text values, so
+         * `application/json` has to be allowed here, as does `authorization`.
+         * A preflight asking for a header that is not covered is refused by
+         * the browser, before the request reaches the server.
+         *
+         * Note that an `Authorization` header the caller sets itself, a bearer
+         * token for instance, is an ordinary header as far as CORS is
+         * concerned. It belongs here, and is not what `credentials` means.
+         */
+        headers?: '*' | string[];
+        /**
+         * `Access-Control-Expose-Headers`: the response headers JavaScript may
+         * read. Only a short safelist is readable without this, so a header the
+         * caller is meant to see — `x-request-id`, a pagination total — has to
+         * be named. `'*'` exposes all of them.
+         */
+        expose?: '*' | string[];
+        /**
+         * Not available in this shape. `Access-Control-Allow-Origin: *` is
+         * refused outright for a credentialed request, and `*` in the other two
+         * headers stops being a wildcard there, so a config that uses one has
+         * to be uncredentialed. Name the origins and headers to send
+         * credentials.
          */
         credentials?: false;
       }
     | {
         /**
-         * The origins that may read the response: exactly those in the list, or
-         * whatever the predicate accepts. A predicate is also how to allow every
-         * origin for a credentialed request, since `'*'` cannot be.
+         * `Access-Control-Allow-Origin`, answered with the origin itself when
+         * the list or predicate accepts it. No `'*'`: a credentialed request
+         * refuses it, so a predicate is how to accept every origin.
          */
         origins: string[] | ((origin: string) => boolean);
         /**
-         * Whether the browser may send cookies and HTTP authentication, and read
-         * the response when it did. This is the browser's ambient credentials —
-         * `fetch(url, { credentials: 'include' })` — not an `Authorization`
-         * header the caller sets itself, which is an ordinary header and belongs
-         * in `headers`.
+         * `Access-Control-Allow-Headers`, naming exactly what a browser may
+         * send. No `'*'`: in a credentialed response it is read as the literal
+         * header name `*` and so allows nothing.
+         */
+        headers?: string[];
+        /**
+         * `Access-Control-Expose-Headers`, naming exactly what JavaScript may
+         * read. No `'*'`, for the same reason as `headers`.
+         */
+        expose?: string[];
+        /**
+         * `Access-Control-Allow-Credentials`. Whether the browser may send
+         * cookies and HTTP authentication and read the response when it did —
+         * its ambient credentials, `fetch(url, { credentials: 'include' })`,
+         * not an `Authorization` header the caller sets itself.
          *
          * Beside a predicate that accepts every origin this switches off the
          * same-origin policy for the endpoint: any page the user visits can
          * then call it as them and read the answer. That is what `'*'` is
          * forbidden to express, and writing it as `origins: () => true` does
-         * not make it safer — only deliberate. Name the origins instead
-         * wherever you can.
+         * not make it safer — only deliberate. Name the origins wherever you
+         * can.
          */
-        credentials?: boolean;
+        credentials: true;
       }
   );
 
@@ -134,10 +159,23 @@ export const corsHeaders = (
   if (config.credentials === true) {
     headers['access-control-allow-credentials'] = 'true';
   }
-  if (config.expose !== undefined && config.expose.length > 0) {
-    headers['access-control-expose-headers'] = config.expose.join(', ');
+  const expose = headerList(config.expose);
+  if (expose !== undefined) {
+    headers['access-control-expose-headers'] = expose;
   }
   return headers;
+};
+
+/**
+ * Render a `'*' | string[]` field as its header value, or undefined where there
+ * is nothing to send. The wildcard goes out verbatim; the type has already
+ * ruled out the credentialed case where it would not be one.
+ */
+const headerList = (value: '*' | string[] | undefined): string | undefined => {
+  if (value === undefined || value.length === 0) {
+    return undefined;
+  }
+  return value === '*' ? '*' : value.join(', ');
 };
 
 /**
@@ -165,8 +203,9 @@ export const preflightHeaders = (
     return headers;
   }
   headers['access-control-allow-methods'] = method;
-  if (config.headers !== undefined && config.headers.length > 0) {
-    headers['access-control-allow-headers'] = config.headers.join(', ');
+  const allowed = headerList(config.headers);
+  if (allowed !== undefined) {
+    headers['access-control-allow-headers'] = allowed;
   }
   if (config.maxAge !== undefined) {
     headers['access-control-max-age'] = String(config.maxAge);

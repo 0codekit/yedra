@@ -177,6 +177,50 @@ test('A Wildcard Without Credentials Does Not Vary', async () => {
   await context.stop();
 });
 
+test('Wildcards Are Sent Verbatim, As The Headers Spell Them', async () => {
+  const context = await app({
+    get: { origins: '*', headers: '*', expose: '*' },
+  }).listen(0, { quiet: true });
+
+  // `Access-Control-Allow-Headers` and `-Expose-Headers` both have a real
+  // wildcard, so yedra takes one and passes it through rather than making the
+  // caller enumerate, or inventing an echo of `Access-Control-Request-Headers`.
+  const pre = await preflight(context.port, '/thing', {
+    origin: APP_ORIGIN,
+    'access-control-request-method': 'GET',
+    'access-control-request-headers': 'content-type, x-anything',
+  });
+  expect(pre.headers['access-control-allow-headers']).toBe('*');
+
+  const response = await fetch(`http://localhost:${context.port}/thing`, {
+    headers: { origin: APP_ORIGIN },
+  });
+  await response.text();
+  expect(response.headers.get('access-control-expose-headers')).toBe('*');
+  await context.stop();
+});
+
+test('Credentials Rule Out A Wildcard In Every Header', () => {
+  // Not three separate rules: `*` is a wildcard in an uncredentialed response
+  // and the literal character in a credentialed one, so it works nowhere once
+  // credentials are on. The type says exactly that.
+
+  const badHeaders: CorsConfig = {
+    origins: [APP_ORIGIN],
+    // @ts-expect-error `'*'` is the literal character once credentials are on
+    headers: '*',
+    credentials: true,
+  };
+  const badExpose: CorsConfig = {
+    origins: [APP_ORIGIN],
+    // @ts-expect-error `'*'` is the literal character once credentials are on
+    expose: '*',
+    credentials: true,
+  };
+  expect(badHeaders.credentials).toBe(true);
+  expect(badExpose.credentials).toBe(true);
+});
+
 test('A Wildcard Cannot Be Combined With Credentials', () => {
   // The CORS specification refuses `*` for a credentialed request, and
   // answering it by reflecting whatever `Origin` arrived would defeat that
