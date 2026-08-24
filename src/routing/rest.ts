@@ -18,6 +18,13 @@ type ReqObject<Params, Query, Headers, Body> = {
   headers: Headers;
   rawHeaders: Record<string, string>;
   body: Body;
+  /**
+   * Aborts when the caller goes away before its response was written — a
+   * cancelled `fetch`, a closed tab, a proxy that gave up. Hand it to anything
+   * that takes an `AbortSignal`, so that work nobody is waiting for stops
+   * rather than running to completion against a socket that is already gone.
+   */
+  signal: AbortSignal;
 };
 
 /**
@@ -115,6 +122,7 @@ export abstract class RestEndpoint {
     query: Record<string, string>;
     headers: Record<string, string>;
     maxBodySize: number;
+    signal: AbortSignal;
   }): Promise<{
     status?: number;
     body: unknown;
@@ -174,6 +182,7 @@ class ConcreteRestEndpoint<
     query: Record<string, string>;
     headers: Record<string, string>;
     maxBodySize: number;
+    signal: AbortSignal;
   }): Promise<{
     status?: number;
     body: unknown;
@@ -251,6 +260,7 @@ class ConcreteRestEndpoint<
         headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
         rawHeaders: req.headers,
         body: parsedBody as Typeof<Req>,
+        signal: req.signal,
       });
     } catch (error) {
       if (error instanceof BodySizeExceededError) {

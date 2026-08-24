@@ -21,6 +21,9 @@ const DEFAULT_ERROR_CODES = new Map<number, string>([
   [405, 'method_not_allowed'],
   [409, 'conflict'],
   [413, 'content_too_large'],
+  // Not a real HTTP status: nginx's code for a client that closed the
+  // connection, recorded when there is nobody left to send a status to.
+  [499, 'client_closed_request'],
   [500, 'internal_server_error'],
 ]);
 

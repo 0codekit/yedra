@@ -6,6 +6,49 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 While yedra is below 1.0.0, breaking changes may land in minor releases.
 
+## [Unreleased]
+
+### Added
+
+- **`req.signal` on every endpoint**, which aborts when the caller goes away
+  before its response was written. Until now a cancelled request ran to
+  completion — the endpoint kept working and the result was written to a socket
+  nobody was listening on — with no way to notice, so a slow upstream call or an
+  expensive query could not be stopped.
+
+  ```typescript
+  async do(req) {
+    const upstream = await fetch(url, { signal: req.signal });
+    return { body: await upstream.json() };
+  }
+  ```
+
+  It is an ordinary `AbortSignal`, so it goes straight into `fetch`, a database
+  driver, or anything else that takes one, and `req.signal.aborted` can be
+  checked between steps of work that does not. A request that was answered in
+  full never aborts its signal, which is what makes it safe to hand to work that
+  outlives the handler.
+
+### Changed
+
+- **A caller that hangs up is recorded as `499`**, not `500`. Passing
+  `req.signal` on means the endpoint rejects with an `AbortError` when the
+  caller disconnects, and yedra would have logged that with a stack trace and
+  counted it as a server error. It is now logged and counted as `499` — nginx's
+  code for a client that closed the connection — and left unmarked on the span,
+  since the server did nothing wrong. Nothing is written back either, for a
+  response whose socket is already closed.
+
+### Fixed
+
+- **A request whose connection is cut mid-upload no longer hangs forever.**
+  `pipe` carries data but not failure, so a body that stopped arriving left the
+  stream an endpoint was reading neither ended nor errored: the read never
+  settled, and with it the request was never finished — no response, no log
+  line, no metric, and everything the handler held kept alive behind it. The
+  body now fails, so the endpoint unwinds as it does for any other broken body,
+  and the request is recorded as `499`.
+
 ## [0.21.1] - 2026-08-11
 
 CORS, and follow-up fixes to 0.21.0 — the latter all in the same classes of bug

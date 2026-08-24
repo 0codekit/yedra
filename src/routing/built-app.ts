@@ -15,6 +15,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 import { Counter } from '../util/counter.js';
+import { RequestAbortedError } from '../util/stream.js';
 import {
   type CorsConfig,
   corsHeaders,
@@ -63,6 +64,46 @@ const METHODS: readonly string[] = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
 const singleHeader = (
   value: string | string[] | undefined,
 ): string | undefined => (Array.isArray(value) ? value[0] : value);
+
+/**
+ * A signal that aborts when the client goes away before its response was
+ * written, so that an endpoint can stop work whose result nobody will receive.
+ *
+ * `close` fires on every response, finished or not, so the two are told apart
+ * by `writableFinished`: it only becomes true once the last byte of the
+ * response has gone out. A response that completed therefore never aborts its
+ * signal, which is what lets an endpoint hand the signal to work that outlives
+ * the handler without that work being cancelled the moment it succeeds.
+ */
+const clientSignal = (res: ServerResponse): AbortSignal => {
+  const controller = new AbortController();
+  res.once('close', () => {
+    if (!res.writableFinished) {
+      controller.abort();
+    }
+  });
+  return controller.signal;
+};
+
+/**
+ * Whether an error is one the client's disconnect caused, rather than a fault
+ * of the endpoint. `fetch`, Node's streams and anything else honouring an
+ * `AbortSignal` report cancellation this way, and passing `req.signal` on is
+ * exactly what yedra asks endpoints to do — so without this, every caller that
+ * hangs up mid-request would be logged and counted as a server error.
+ *
+ * Where the error is merely shaped like a cancellation, the signal has to have
+ * aborted as well: an `AbortError` from some unrelated controller of the
+ * endpoint's own is a genuine failure and stays one.
+ */
+const isClientAbort = (error: unknown, signal: AbortSignal): boolean =>
+  // A body that was cut off says so on its own: the connection is gone whether
+  // or not the response has noticed yet.
+  error instanceof RequestAbortedError ||
+  (signal.aborted &&
+    error instanceof Error &&
+    (error.name === 'AbortError' ||
+      (error as { code?: unknown }).code === 'ABORT_ERR'));
 
 /**
  * Flatten Node's request headers, which repeat as arrays, into the single-valued
@@ -145,6 +186,7 @@ export class BuiltApp {
   ): Promise<void> {
     const url = new URL(req.url as string, 'http://localhost');
     const begin = Date.now();
+    const signal = clientSignal(res);
     let status = 500;
     let route: string | undefined;
     try {
@@ -153,10 +195,15 @@ export class BuiltApp {
         url,
         body: req,
         headers: req.headers,
+        signal,
       });
       status = response.status ?? 200;
       route = response.route;
-      await writeResponse(req, res, response);
+      if (!signal.aborted) {
+        // An aborted signal means the response stream is already closed, so
+        // there is nothing left to write to and no reason to try.
+        await writeResponse(req, res, response);
+      }
     } catch (error) {
       // performRequest already maps HttpError and unexpected errors to
       // responses, so reaching here means the socket itself misbehaved.
@@ -207,6 +254,7 @@ export class BuiltApp {
     url: URL;
     body: Readable;
     headers: Record<string, string | string[] | undefined>;
+    signal: AbortSignal;
   }): Promise<RoutedResponse> {
     if (req.method === 'OPTIONS') {
       return this.optionsResponse(req.url.pathname, req.headers);
@@ -280,6 +328,7 @@ export class BuiltApp {
       url: URL;
       body: Readable;
       headers: Record<string, string | string[] | undefined>;
+      signal: AbortSignal;
     },
     match: {
       endpoint: RestEndpoint;
@@ -312,6 +361,7 @@ export class BuiltApp {
           params: match.params,
           query: Object.fromEntries(req.url.searchParams),
           headers: flattenHeaders(req.headers),
+          signal: req.signal,
         })),
       });
     } catch (error) {
@@ -319,6 +369,17 @@ export class BuiltApp {
         return addCors({
           route,
           ...errorResponse(error.status, error.message, error.code),
+        });
+      }
+      if (isClientAbort(error, req.signal)) {
+        // The caller hung up and the endpoint stopped because of it. Nothing
+        // will be written, but the request still has to be logged and counted
+        // as something: 499 is what nginx records for a client that closed the
+        // connection, and being below 500 it leaves the span unmarked, since
+        // the server did nothing wrong.
+        return addCors({
+          route,
+          ...errorResponse(499, 'Client closed request.'),
         });
       }
       console.error(error);

@@ -187,6 +187,8 @@ parameter:
 6. `req.url` is the HTTP path, so it does not include the hostname, and starts
    with `/`.
 7. `req.method` is the HTTP method of the endpoint.
+8. `req.signal` aborts when the caller disconnects. See
+   [cancellation](#cancellation).
 
 Since `params`, `query` and `headers` only ever arrive as strings, schemas like
 `y.number()` and `y.boolean()` coerce them automatically. Coercion is strict: a
@@ -208,6 +210,41 @@ headers: { "set-cookie": ["a=1; Path=/", "b=2; Path=/"] }
 
 `Content-Length` is computed for you on a buffered body and cannot be overridden,
 since a value that disagrees with the bytes being sent is a framing error.
+
+### Cancellation
+
+`req.signal` is an `AbortSignal` that aborts when the caller goes away before it
+was answered — a cancelled `fetch`, a closed tab, a proxy that gave up. Pass it
+to anything that takes one, and work nobody is waiting for stops instead of
+running to completion:
+
+```ts
+async do(req) {
+  const upstream = await fetch("https://slow.example.com/report", {
+    signal: req.signal,
+  });
+  return { body: await upstream.json() };
+}
+```
+
+For work that takes no signal, check `req.signal.aborted` between steps, or
+listen for the event:
+
+```ts
+req.signal.addEventListener("abort", () => job.cancel());
+```
+
+A request that was answered in full never aborts its signal, so it is safe to
+hand to work that outlives the handler.
+
+Reading the request body of a caller that disconnected fails rather than waiting
+for bytes that will never arrive, so an endpoint holding a `y.stream()` body
+unwinds on its own even without consulting the signal.
+
+Once the caller has gone, nothing is written back. The request is logged and
+counted as `499`, the status nginx uses for a client that closed the connection,
+and an `AbortError` that reaches yedra because the endpoint passed `req.signal`
+on is treated as part of that rather than as a server error.
 
 ### HEAD And OPTIONS
 

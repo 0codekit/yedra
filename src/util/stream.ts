@@ -16,6 +16,21 @@ export class BodySizeExceededError extends Error {
 }
 
 /**
+ * Thrown into a request body whose connection was cut before the whole body had
+ * arrived. The routing layer recognises it as the caller having gone away
+ * rather than as a failure of the endpoint.
+ */
+export class RequestAbortedError extends Error {
+  public constructor(options?: { cause?: unknown }) {
+    super(
+      'The connection closed before the request body had fully arrived.',
+      options,
+    );
+    this.name = 'RequestAbortedError';
+  }
+}
+
+/**
  * Wrap a request body so that it fails once more than `maxBytes` have been
  * read. Applying the limit to the stream rather than inside each body type
  * means every body — buffered, JSON, or streamed — is bounded by the same
@@ -40,6 +55,28 @@ export const limitBody = (source: Readable, maxBytes: number): Readable => {
     },
   });
   source.pipe(limited);
+  // `pipe` carries data but not failure: a caller that disconnects mid-upload
+  // leaves the request destroyed while `limited` is neither ended nor errored,
+  // so an endpoint reading the body would wait on it for the life of the
+  // process — no response, no log line, no metric, and the handler's state kept
+  // alive behind it. Fail the body instead, so the read rejects and the
+  // endpoint unwinds like it does for any other broken body.
+  const abort = (cause?: unknown): void => {
+    limited.destroy(new RequestAbortedError({ cause }));
+  };
+  source.on('error', abort);
+  source.on('close', () => {
+    // `close` also follows a body that arrived in full, which is the one case
+    // this must leave alone.
+    if (!source.readableEnded) {
+      abort();
+    }
+  });
+  // `destroy` emits `error`, and by the time a body is cut off there may be
+  // nobody reading any more — an endpoint that stopped early, or the 413 path
+  // below. An `error` event with no listener takes the process down, so this
+  // keeps one attached; a reader still sees the failure through its own.
+  limited.on('error', () => {});
   // Deliberately not destroying `source` here: it is the request socket, and
   // tearing it down would kill the connection before the 413 response could
   // be written. The caller stops reading instead, which applies TCP
