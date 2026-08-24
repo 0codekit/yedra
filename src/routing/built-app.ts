@@ -14,6 +14,7 @@ import {
   SpanStatusCode,
   trace,
 } from '@opentelemetry/api';
+import { remoteAddress } from '../util/address.js';
 import { Counter } from '../util/counter.js';
 import { RequestAbortedError } from '../util/stream.js';
 import {
@@ -195,6 +196,9 @@ export class BuiltApp {
         url,
         body: req,
         headers: req.headers,
+        // Read now rather than inside the endpoint: a caller that hangs up has
+        // its socket destroyed, and with it the address it connected from.
+        socketAddress: remoteAddress(req.socket),
         signal,
       });
       status = response.status ?? 200;
@@ -254,6 +258,7 @@ export class BuiltApp {
     url: URL;
     body: Readable;
     headers: Record<string, string | string[] | undefined>;
+    socketAddress: string | undefined;
     signal: AbortSignal;
   }): Promise<RoutedResponse> {
     if (req.method === 'OPTIONS') {
@@ -328,6 +333,7 @@ export class BuiltApp {
       url: URL;
       body: Readable;
       headers: Record<string, string | string[] | undefined>;
+      socketAddress: string | undefined;
       signal: AbortSignal;
     },
     match: {
@@ -361,6 +367,7 @@ export class BuiltApp {
           params: match.params,
           query: Object.fromEntries(req.url.searchParams),
           headers: flattenHeaders(req.headers),
+          socketAddress: req.socketAddress,
           signal: req.signal,
         })),
       });

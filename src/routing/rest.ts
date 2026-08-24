@@ -19,6 +19,18 @@ type ReqObject<Params, Query, Headers, Body> = {
   rawHeaders: Record<string, string>;
   body: Body;
   /**
+   * The IP address the request arrived from — the other end of the TCP
+   * connection, which yedra knows and the request itself cannot say.
+   *
+   * Behind a reverse proxy this is the proxy, since that is who connected.
+   * The client it forwarded for is in `X-Forwarded-For`, which is a header
+   * like any other: read it from `rawHeaders` if you trust whoever set it.
+   *
+   * Undefined only if the connection is already gone by the time the endpoint
+   * runs.
+   */
+  socketAddress: string | undefined;
+  /**
    * Aborts when the caller goes away before its response was written — a
    * cancelled `fetch`, a closed tab, a proxy that gave up. Hand it to anything
    * that takes an `AbortSignal`, so that work nobody is waiting for stops
@@ -122,6 +134,7 @@ export abstract class RestEndpoint {
     query: Record<string, string>;
     headers: Record<string, string>;
     maxBodySize: number;
+    socketAddress: string | undefined;
     signal: AbortSignal;
   }): Promise<{
     status?: number;
@@ -182,6 +195,7 @@ class ConcreteRestEndpoint<
     query: Record<string, string>;
     headers: Record<string, string>;
     maxBodySize: number;
+    socketAddress: string | undefined;
     signal: AbortSignal;
   }): Promise<{
     status?: number;
@@ -260,6 +274,7 @@ class ConcreteRestEndpoint<
         headers: parsedHeaders as Typeof<ObjectSchema<Headers>>,
         rawHeaders: req.headers,
         body: parsedBody as Typeof<Req>,
+        socketAddress: req.socketAddress,
         signal: req.signal,
       });
     } catch (error) {

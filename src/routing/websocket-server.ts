@@ -8,6 +8,7 @@ import {
   trace,
 } from '@opentelemetry/api';
 import { WebSocketServer } from 'ws';
+import { remoteAddress } from '../util/address.js';
 import { HttpError } from './errors.js';
 import type { WsEndpoint } from './websocket.js';
 
@@ -198,7 +199,13 @@ export const createWebSocketServer = (options: {
                 Array.isArray(value) ? value.join(',') : (value ?? ''),
               ]),
             );
-            await match.endpoint.handle(url, match.params, headers, ws);
+            await match.endpoint.handle({
+              url,
+              params: match.params,
+              headers,
+              socketAddress: remoteAddress(req.socket),
+              ws,
+            });
           } catch (error) {
             if (error instanceof HttpError) {
               // The caller's fault, like a 4xx, so not the server's error.

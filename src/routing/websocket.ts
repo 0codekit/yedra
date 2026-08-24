@@ -146,6 +146,18 @@ type WebSocketOptions<
       query: Typeof<ObjectSchema<Query>>;
       headers: Typeof<ObjectSchema<Headers>>;
       rawHeaders: Record<string, string>;
+      /**
+       * The IP address the connection came from — the other end of the TCP
+       * connection, which yedra knows and the handshake itself cannot say.
+       *
+       * Behind a reverse proxy this is the proxy, since that is who connected.
+       * The client it forwarded for is in `X-Forwarded-For`, which is a header
+       * like any other: read it from `rawHeaders` if you trust whoever set it.
+       *
+       * Undefined only if the connection is already gone by the time the
+       * handler runs.
+       */
+      socketAddress: string | undefined;
     },
   ) => Promise<void> | void;
 };
@@ -158,12 +170,13 @@ type WebSocketOptions<
  * standard that covers this.
  */
 export abstract class WsEndpoint {
-  public abstract handle(
-    url: URL,
-    params: Record<string, string>,
-    headers: Record<string, string>,
-    ws: NodeWebSocket,
-  ): Promise<void>;
+  public abstract handle(req: {
+    url: URL;
+    params: Record<string, string>;
+    headers: Record<string, string>;
+    socketAddress: string | undefined;
+    ws: NodeWebSocket;
+  }): Promise<void>;
 }
 
 export class Ws<
@@ -184,21 +197,22 @@ export class Ws<
     this.headersSchema = laxObject(options.headers);
   }
 
-  public async handle(
-    url: URL,
-    params: Record<string, string>,
-    headers: Record<string, string>,
-    ws: NodeWebSocket,
-  ): Promise<void> {
+  public async handle(req: {
+    url: URL;
+    params: Record<string, string>;
+    headers: Record<string, string>;
+    socketAddress: string | undefined;
+    ws: NodeWebSocket;
+  }): Promise<void> {
     let parsedParams: Typeof<ObjectSchema<Params>>;
     let parsedQuery: Typeof<ObjectSchema<Query>>;
     let parsedHeaders: Typeof<ObjectSchema<Headers>>;
     try {
-      parsedParams = this.paramsSchema.parse(params);
+      parsedParams = this.paramsSchema.parse(req.params);
       parsedQuery = this.querySchema.parse(
-        Object.fromEntries(url.searchParams),
+        Object.fromEntries(req.url.searchParams),
       );
-      parsedHeaders = this.headersSchema.parse(headers);
+      parsedHeaders = this.headersSchema.parse(req.headers);
     } catch (error) {
       if (error instanceof ValidationError) {
         throw new BadRequestError(error.format(), undefined, {
@@ -207,12 +221,13 @@ export class Ws<
       }
       throw error;
     }
-    await this.options.do(new YedraWebSocket(ws), {
-      url: url.pathname,
+    await this.options.do(new YedraWebSocket(req.ws), {
+      url: req.url.pathname,
       params: parsedParams,
       query: parsedQuery,
       headers: parsedHeaders,
-      rawHeaders: headers,
+      rawHeaders: req.headers,
+      socketAddress: req.socketAddress,
     });
   }
 }

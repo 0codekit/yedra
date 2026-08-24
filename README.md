@@ -187,7 +187,9 @@ parameter:
 6. `req.url` is the HTTP path, so it does not include the hostname, and starts
    with `/`.
 7. `req.method` is the HTTP method of the endpoint.
-8. `req.signal` aborts when the caller disconnects. See
+8. `req.socketAddress` is the IP address the request arrived from. See
+   [client addresses](#client-addresses).
+9. `req.signal` aborts when the caller disconnects. See
    [cancellation](#cancellation).
 
 Since `params`, `query` and `headers` only ever arrive as strings, schemas like
@@ -210,6 +212,31 @@ headers: { "set-cookie": ["a=1; Path=/", "b=2; Path=/"] }
 
 `Content-Length` is computed for you on a buffered body and cannot be overridden,
 since a value that disagrees with the bytes being sent is a framing error.
+
+### Client Addresses
+
+`req.socketAddress` is the IP address at the other end of the connection — what
+yedra knows about the caller and the request itself cannot say:
+
+```ts
+async do(req) {
+  await rateLimit(req.socketAddress ?? "unknown");
+  return { body: await handle(req.body) };
+}
+```
+
+An IPv4 client on a dual-stack listener is reported as `203.0.113.7`, not in the
+`::ffff:203.0.113.7` form Node gives it, so the value compares equal to the same
+address written anywhere else. It is `undefined` only if the connection is
+already gone by the time the endpoint runs.
+
+Behind a reverse proxy this is the proxy, since that is who connected. The
+client it forwarded for is in `X-Forwarded-For`, which yedra deliberately does
+not read for you: that header is set by whoever spoke last, so trusting it
+without knowing your proxy chain lets any caller claim any address. Read it from
+`req.rawHeaders` once you know how many hops in front of you are yours.
+
+WebSocket endpoints get the same `req.socketAddress`, taken at the handshake.
 
 ### Cancellation
 

@@ -10,6 +10,27 @@ While yedra is below 1.0.0, breaking changes may land in minor releases.
 
 ### Added
 
+- **`req.socketAddress` on every endpoint**, the IP address the request arrived
+  from. Until now an application had no way to learn who was calling it — rate
+  limiting, allowlists and audit logs all need the address, and nothing in the
+  request itself can be trusted to state it.
+
+  ```typescript
+  async do(req) {
+    await rateLimit(req.socketAddress ?? 'unknown');
+    return { body: await handle(req.body) };
+  }
+  ```
+
+  It is the other end of the TCP connection, which is the proxy when there is
+  one in front. `X-Forwarded-For` is deliberately not consulted: it is set by
+  whoever spoke last, so reading it without knowing your own proxy chain lets
+  any caller claim any address. It stays available in `req.rawHeaders` for an
+  application that does know. An IPv4 peer on a dual-stack listener is reported
+  as `203.0.113.7` rather than in Node's `::ffff:203.0.113.7` form, so the value
+  compares equal to the same address written anywhere else. WebSocket endpoints
+  get it too, taken at the handshake.
+
 - **`req.signal` on every endpoint**, which aborts when the caller goes away
   before its response was written. Until now a cancelled request ran to
   completion — the endpoint kept working and the result was written to a socket
