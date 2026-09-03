@@ -52,13 +52,42 @@ jobs:
             exit 1
           fi
 
-      # `prepublishOnly` runs check, typecheck, test and build, so this repeats
-      # the CI gates against the exact tree being published. That is worth the
-      # duplicated minutes here: CI passing on a branch says nothing about the
-      # tag if the two ever diverge.
+      # Staged rather than published outright: the tarball goes to npm's stage
+      # queue, where it is invisible to `pnpm install` until a maintainer
+      # approves it from a trusted device with a 2FA challenge. That is the
+      # point of the exercise — a workflow cannot answer a 2FA prompt, so
+      # anything that publishes straight from CI is only as trustworthy as its
+      # credentials, and this puts a human back in front of the release without
+      # making CI interactive.
+      #
+      # `pnpm stage publish` takes the same arguments as `pnpm publish` and runs
+      # the same lifecycle scripts, so `prepublishOnly` still gates this on
+      # check, typecheck, test and build against the exact tree being staged.
+      # That is worth the duplicated minutes: CI passing on a branch says
+      # nothing about the tag if the two ever diverge.
       #
       # `--no-git-checks` because pnpm otherwise refuses to publish from the
-      # detached HEAD a tag checkout produces. `--provenance` publishes a signed
+      # detached HEAD a tag checkout produces. `--provenance` attaches a signed
       # attestation linking these bytes to this workflow run.
-      - name: Publish to npm
-        run: pnpm publish --provenance --no-git-checks
+      - name: Stage for publishing
+        run: pnpm stage publish --provenance --no-git-checks
+
+      # The job cannot finish the release, so it says so where the person who
+      # can will look.
+      - name: Explain how to approve
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          {
+            echo "### $TAG is staged, not published"
+            echo
+            echo 'It is invisible to `pnpm install` until approved:'
+            echo
+            echo '```'
+            echo 'pnpm stage list yedra   # find the stage id'
+            echo 'pnpm stage view <id>    # check what is in the tarball'
+            echo 'pnpm stage approve <id> # 2FA challenge, then it goes live'
+            echo '```'
+            echo
+            echo 'Or use the Staged Packages tab on npmjs.com.'
+          } >> "$GITHUB_STEP_SUMMARY"
