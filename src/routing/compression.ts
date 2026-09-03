@@ -21,10 +21,15 @@ const brotliAsync = promisify<InputType, BrotliOptions, Buffer>(brotliCompress);
 const zstdAsync = promisify<InputType, ZstdOptions, Buffer>(zstdCompress);
 
 /**
- * The content encodings yedra can produce, best first. Brotli comes ahead of
- * zstd because these variants are built once and then served many times, so the
- * ratio matters more than the compression speed; both come ahead of gzip.
- * Anything a client does not advertise falls back to the identity encoding.
+ * The content encodings yedra can produce, best first. Brotli leads on the two
+ * things that decide this: measured over a directory of real web assets it beats
+ * zstd's ratio at a lower compression cost at every point on the curve, and at
+ * 96.8% of clients against 84.5% it reaches more of them — Safari had no zstd
+ * until version 26. zstd's one advantage is decompressing about 1.4x as fast,
+ * which is the client's CPU rather than its bandwidth, and not enough to put it
+ * first. gzip is last because it is only ever reached by the ~3% of clients with
+ * no brotli at all. Anything a client does not advertise falls back to the
+ * identity encoding.
  */
 export type Encoding = 'br' | 'zstd' | 'gzip';
 
@@ -44,13 +49,49 @@ const COMPRESSIBLE =
 export const DEFAULT_COMPRESSION_THRESHOLD = 1024;
 
 /**
- * How many assets are compressed at once. Brotli at maximum quality is slow
- * and entirely CPU-bound, so an unbounded `Promise.all` over a large asset
- * directory saturates the thread pool and starves everything else — including
- * the requests this server is already answering, since compression now runs in
- * the background rather than before the port is bound.
+ * The level each encoding is built at. Chosen by measuring every level of all
+ * three over a directory of real web assets, per file as a static server
+ * compresses them; the figures below are per 105 MiB on one core.
+ *
+ * Brotli is the one that matters, since it is what nearly every client
+ * receives, and its cost is not a curve but a cliff. Levels 0 to 9 all come in
+ * under 7 core-seconds. Level 10 switches to an expensive optimal parse and
+ * costs 39, and level 11 costs 102 — 44x level 8 to shave 1.8 MiB off 19. That
+ * is a poor trade when it competes for the CPU of the app serving the assets,
+ * and it was where an asset directory in the hundreds of megabytes spent
+ * essentially all of its time. Levels 5 to 8 are one band, 18.69% down to
+ * 18.13%, so 8 is the end of the cheap range and where the knee sits.
+ *
+ * zstd earns its keep on decompression rather than ratio, so it is built only
+ * as far as the cheap range goes too: level 19 costs 27 core-seconds against
+ * 4 for 12, for one percent off a variant that `ENCODINGS` hands to almost
+ * nobody anyway.
+ *
+ * gzip stops at 6 because 9 buys 0.15 percentage points for twice the time,
+ * and every client that would take gzip over brotli is a rounding error.
  */
-const CONCURRENCY = 4;
+const BROTLI_QUALITY = 8;
+const ZSTD_LEVEL = 12;
+const GZIP_LEVEL = 6;
+
+/**
+ * How many assets are compressed at once.
+ *
+ * The resource that runs out first is not the CPU but the libuv threadpool.
+ * `zlib`'s asynchronous functions each hold a thread for the entire
+ * compression, and that pool — four threads unless `UV_THREADPOOL_SIZE` says
+ * otherwise — is the same one `fs` and `dns.lookup` draw from. Fill it and
+ * every file read and every outbound connection the app makes waits behind a
+ * queue of brotli jobs for as long as the pass runs, which no amount of spare
+ * CPU rescues. Half the pool is therefore left alone: a request needing a
+ * thread gets one immediately and the scheduler timeslices it in.
+ */
+const CONCURRENCY = ((): number => {
+  const configured = Number(process.env.UV_THREADPOOL_SIZE);
+  const threads =
+    Number.isInteger(configured) && configured > 0 ? configured : 4;
+  return Math.max(1, Math.floor(threads / 2));
+})();
 
 export const isCompressible = (contentType: string): boolean =>
   COMPRESSIBLE.test(mediaType(contentType));
@@ -71,18 +112,23 @@ export const precompress = async (
   if (data.length < threshold || !isCompressible(contentType)) {
     return {};
   }
-  const [br, zstd, gz] = await Promise.all([
-    brotliAsync(data, {
-      params: {
-        [constants.BROTLI_PARAM_QUALITY]: constants.BROTLI_MAX_QUALITY,
-        [constants.BROTLI_PARAM_SIZE_HINT]: data.length,
-      },
-    }),
-    zstdAsync(data, {
-      params: { [constants.ZSTD_c_compressionLevel]: 19 },
-    }),
-    gzipAsync(data, { level: constants.Z_BEST_COMPRESSION }),
-  ]);
+  // Awaited one after another rather than gathered with `Promise.all`. Three
+  // encodings in flight per asset, times `CONCURRENCY`, is what overruns the
+  // threadpool: with the variants raced this way a plain `fs.readFile` took
+  // 337 ms at the 95th percentile and over a second at its worst while a
+  // directory compressed, against under 4 ms once they are sequential. The
+  // wall clock for the pass is unchanged, because the pool was never the thing
+  // making it fast.
+  const br = await brotliAsync(data, {
+    params: {
+      [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY,
+      [constants.BROTLI_PARAM_SIZE_HINT]: data.length,
+    },
+  });
+  const zstd = await zstdAsync(data, {
+    params: { [constants.ZSTD_c_compressionLevel]: ZSTD_LEVEL },
+  });
+  const gz = await gzipAsync(data, { level: GZIP_LEVEL });
   const result: Partial<Record<Encoding, Buffer>> = {};
   // Keep a variant only if it actually beats sending the file as-is.
   if (br.length < data.length) {

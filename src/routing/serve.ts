@@ -269,10 +269,13 @@ export class StaticAssets {
 
   /**
    * Compress every asset in the background, filling in each file's `encoded`
-   * variants as it goes. Deliberately not awaited by `load`: brotli and zstd at
-   * high quality are entirely CPU-bound, and a large asset directory would
-   * otherwise hold the port closed for seconds. Until a file's turn comes it is
-   * served as-is, which is a valid representation.
+   * variants as it goes. Deliberately not awaited by `load`: this is entirely
+   * CPU-bound, and a large asset directory would otherwise hold the port closed
+   * while it ran. Until a file's turn comes it is served as-is, which is a
+   * valid representation.
+   *
+   * The pass is bounded so that it cannot starve the app it runs beside; see
+   * `CONCURRENCY` in `compression.ts` for what it is bounded against and why.
    * @param files - The loaded assets, mutated in place.
    * @param threshold - The smallest file worth compressing, in bytes.
    * @param quiet - Whether to suppress the failure log.
@@ -288,7 +291,17 @@ export class StaticAssets {
     }
     // `/index.html` and `/` share one object, as does a file used as the
     // fallback, so compress each distinct asset once.
-    const distinct = [...new Set(files)];
+    //
+    // Smallest first, because the assets a page actually blocks on — the
+    // document, its stylesheet, its entry bundle — are the small ones, while a
+    // large directory's bytes sit mostly in a handful of multi-megabyte files,
+    // often source maps nobody but an open devtools panel requests. Same total
+    // work either way, and at these levels the whole pass is short, but it
+    // costs one sort to have the files that matter covered first rather than
+    // behind everything else in the directory listing.
+    const distinct = [...new Set(files)].sort(
+      (a, b) => a.data.length - b.data.length,
+    );
     return compressAll(distinct, async (file) => {
       file.encoded = await precompress(file.data, file.mime, threshold);
     }).catch((error: unknown) => {

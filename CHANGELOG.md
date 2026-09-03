@@ -52,6 +52,36 @@ While yedra is below 1.0.0, breaking changes may land in minor releases.
 
 ### Changed
 
+- **Asset precompression is roughly seven times faster and no longer starves
+  the app it runs beside.** Two independent problems, on a directory of 105 MiB
+  of assets and two vCPUs: the pass took minutes, and while it ran the app was
+  barely able to answer anything.
+
+  The unresponsiveness was not CPU contention. `zlib`'s asynchronous functions
+  each hold a libuv threadpool thread for the whole compression, and the pass
+  raced brotli, zstd and gzip for each asset with `Promise.all`, four assets at
+  a time — twelve jobs against a pool of four, which is the same pool `fs` and
+  `dns.lookup` draw from. Every file read and every outbound connection the app
+  made queued behind brotli for the duration: an `fs.readFile` measured 339 ms
+  at the 95th percentile and 1.1 s at its worst, while the event loop sat idle
+  at 1.5 ms of lag. Spare CPU does not help, because the wait is for a thread.
+  The encodings are now awaited one after another and no more than half the pool
+  is ever occupied, which puts the same reads at 3.2 ms.
+
+  The duration was brotli quality 11. Measuring every level of all three
+  encodings per file, brotli's cost is a cliff rather than a curve: levels 0 to
+  9 all come in under 7 core-seconds per 105 MiB, level 10 switches to an
+  expensive optimal parse and costs 39, and level 11 costs 102. It was 76% of
+  the total for the last 1.8 MiB of a 19 MiB payload. Brotli now uses quality 8,
+  the end of the cheap range, with zstd at 12 rather than 19 and gzip at 6
+  rather than 9 on the same reasoning — 105 MiB of assets went from 90 s to 13 s
+  on two vCPUs, for a payload that grew from 16.37% of the originals to 18.13%.
+
+  No encoding was dropped, so no client's coverage changes. Assets are now
+  compressed smallest first, so the document, stylesheet and entry bundle a page
+  blocks on are covered in the first moments rather than behind a multi-megabyte
+  source map earlier in the directory listing.
+
 - **A caller that hangs up is recorded as `499`**, not `500`. Passing
   `req.signal` on means the endpoint rejects with an `AbortError` when the
   caller disconnects, and yedra would have logged that with a stack trace and

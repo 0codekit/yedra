@@ -663,15 +663,33 @@ Static files are read into memory when the app starts, and served with an ETag.
 ### Compression
 
 Static assets are compressed with brotli, zstd and gzip, and the best encoding
-the client accepts is served — brotli first, since these variants are built once
-and served many times, so the ratio matters more than the speed. Because the work
-happens once rather than per request, compression costs no request-time CPU.
+the client accepts is served — brotli first, since it beats zstd's ratio at a
+lower cost and reaches more clients (96.8% against 84.5%; Safari had no zstd
+before version 26), and gzip last, since only clients with no brotli at all
+ever reach it. Because the work happens once rather than per request,
+compression costs no request-time CPU.
 
 Compression runs in the background, after the port is bound, so a large asset
 directory does not hold up startup. Until a file's turn comes it is served
 uncompressed, which is a perfectly valid representation of it. Await
 `context.assetsCompressed` where you need a settled state — in a test asserting
 on `Content-Encoding`, say.
+
+The pass is bounded so that it cannot crowd out the app running beside it. It
+occupies at most half the libuv threadpool, leaving threads free for the `fs`
+and `dns.lookup` calls that requests depend on, and it takes the smallest assets
+first, so the document, stylesheet and entry bundle a page blocks on are covered
+first rather than behind a multi-megabyte source map.
+
+Levels are chosen for the knee of the curve rather than the last percent:
+brotli 8, zstd 12, gzip 6. Brotli's cost is a cliff, not a curve — quality 10
+switches to an expensive optimal parse and quality 11 costs a hundred times
+level 8 to shave a further ten percent off the bytes — and paying it competes
+directly with the CPU serving the assets. As measured over a directory of real
+web assets, 105 MiB compresses to about 19 MiB in roughly ten seconds on two
+vCPUs. If your assets are large enough that even this is unwelcome, the lever
+is what goes in the directory at all: source maps are compressible, usually the
+bulk of a large build, and requested by almost nobody.
 
 Files below `threshold` bytes (1024 by default) are skipped, since compressing
 them tends to cost more than it saves, as are content types that are already

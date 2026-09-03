@@ -1,4 +1,7 @@
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { get } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   brotliDecompressSync,
   gunzipSync,
@@ -150,6 +153,45 @@ test('Compressed Bytes Are Actually Smaller And Valid', async () => {
   expect(decoded.toString()).toContain('.rule-1 {');
   expect(body.length).toBeLessThan(decoded.length);
   await context.stop();
+});
+
+test('Large Assets Round-Trip Through Every Variant', async () => {
+  // The rest of these tests serve files of a few kilobytes. This one is over
+  // 256 KiB, large enough to exercise every encoder outside the regime where a
+  // file fits in its window whole, and to catch a variant that decodes to
+  // something subtly other than the input.
+  const dir = await mkdtemp(join(tmpdir(), 'yedra-compress-'));
+  try {
+    const css = Array.from(
+      { length: 12000 },
+      (_, i) => `.rule-${i} { margin: ${i % 32}px; color: #abcdef; }`,
+    ).join('\n');
+    expect(css.length).toBeGreaterThan(256 * 1024);
+    await writeFile(join(dir, 'huge.css'), css);
+    const context = await new Yedra().listen(0, {
+      serve: { dir },
+      quiet: true,
+    });
+    try {
+      await context.assetsCompressed;
+      const url = `http://localhost:${context.port}/huge.css`;
+      const decoders = {
+        br: brotliDecompressSync,
+        zstd: zstdDecompressSync,
+        gzip: gunzipSync,
+      };
+      for (const [encoding, decode] of Object.entries(decoders)) {
+        const { encoding: served, body } = await rawGet(url, encoding);
+        expect(served).toBe(encoding);
+        expect(decode(body).toString()).toStrictEqual(css);
+        expect(body.length).toBeLessThan(css.length);
+      }
+    } finally {
+      await context.stop();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
 });
 
 test('Small And Incompressible Files Are Sent As-Is', async () => {
