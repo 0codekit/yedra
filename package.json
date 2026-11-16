@@ -1,6 +1,6 @@
 {
 	"name": "yedra",
-	"version": "0.21.4",
+	"version": "0.21.5",
 	"repository": "github:0codekit/yedra",
 	"main": "dist/index.js",
 	"types": "dist/index.d.ts",
@@ -16,11 +16,11 @@
 	},
 	"sideEffects": false,
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.10",
-		"@types/node": "^26.2.0",
-		"@types/ws": "^8.18.1",
+		"@biomejs/biome": "^2.6.7",
+		"@types/node": "^26.6.6",
+		"@types/ws": "^8.18.2",
 		"typescript": "^7.0.2",
-		"vitest": "^4.1.11"
+		"vitest": "^5.1.0"
 	},
 	"bugs": "https://github.com/0codekit/yedra/issues",
 	"contributors": [
@@ -47,17 +47,17 @@
 	"packageManager": "pnpm@11.3.0",
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"check": "biome check src",
-		"format": "biome check --write src",
+		"check": "biome check src test",
+		"format": "biome check --write src test",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"prepublishOnly": "pnpm run check && pnpm run typecheck && pnpm run test && pnpm run build"
 	},
 	"type": "module",
 	"dependencies": {
-		"@opentelemetry/api": "^1.9.1",
+		"@opentelemetry/api": "^1.10.0",
 		"@standard-schema/spec": "^1.1.0",
-		"mime": "^4.1.0",
-		"ws": "^8.21.3"
+		"mime": "^4.1.2",
+		"ws": "^8.23.0"
 	}
 }

@@ -99,7 +99,7 @@ test('Server Static With Fallback', async () => {
   const response2 = await fetch(`http://localhost:${context.port}/abcd`);
   expect(response2.status).toBe(200);
   expect(await response2.text()).toStrictEqual(`<!DOCTYPE html>
-<html>
+<html lang="en">
   <body>
     This is the default file.
   </body>

@@ -90,6 +90,10 @@ While yedra is below 1.0.0, breaking changes may land in minor releases.
   since the server did nothing wrong. Nothing is written back either, for a
   response whose socket is already closed.
 
+- **Dependencies updated**: `@opentelemetry/api` to 1.10.0, `mime` to 4.1.2 and
+  `ws` to 8.23.0. Development moved to vitest 5 and Biome 2.6, and
+  `pnpm run check` now covers the test fixtures as well as `src`.
+
 ### Fixed
 
 - **A request whose connection is cut mid-upload no longer hangs forever.**
