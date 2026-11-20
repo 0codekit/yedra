@@ -13,7 +13,17 @@ type WebSocketEvents = {
   message: [message: Buffer];
   close: [code: number | undefined, reason: string | undefined];
   error: [error: Error];
+  ping: [data: Buffer];
+  pong: [data: Buffer];
 };
+
+/**
+ * Events that are dropped rather than queued when no handler exists yet. A ping
+ * or pong is a liveness signal that is stale by the time anyone could act on it,
+ * and a client can send pings without limit, so queueing them for an endpoint
+ * that never listens would let any client grow the server's memory unbounded.
+ */
+const unqueued: ReadonlySet<keyof WebSocketEvents> = new Set(['ping', 'pong']);
 
 type Handler<Event extends keyof WebSocketEvents> = (
   ...args: WebSocketEvents[Event]
@@ -31,11 +41,11 @@ class YedraWebSocket {
    */
   private readonly queues: {
     [Event in keyof WebSocketEvents]: WebSocketEvents[Event][];
-  } = { message: [], close: [], error: [] };
+  } = { message: [], close: [], error: [], ping: [], pong: [] };
 
   private readonly handlers: {
     [Event in keyof WebSocketEvents]: Handler<Event>[];
-  } = { message: [], close: [], error: [] };
+  } = { message: [], close: [], error: [], ping: [], pong: [] };
 
   public constructor(ws: NodeWebSocket) {
     this.ws = ws;
@@ -48,6 +58,12 @@ class YedraWebSocket {
     });
     ws.on('error', (error: Error) => {
       this.emit('error', error);
+    });
+    ws.on('ping', (data: Buffer) => {
+      this.emit('ping', data);
+    });
+    ws.on('pong', (data: Buffer) => {
+      this.emit('pong', data);
     });
   }
 
@@ -65,6 +81,11 @@ class YedraWebSocket {
    * An `error` handler sees connection failures — a protocol violation, or a
    * message larger than the configured `maxPayload`. The socket is closing by
    * the time it fires, so `close` follows.
+   *
+   * `ping` and `pong` fire when the client sends a ping or pong frame, with its
+   * payload. A ping is answered with a pong automatically, so a `ping` handler
+   * is for observing it, not for replying. Unlike the other events, these are
+   * not queued: one that arrives before a handler exists is dropped.
    * @param event - The event to listen for.
    * @param handler - The handler to add.
    */
@@ -88,7 +109,9 @@ class YedraWebSocket {
     ...args: WebSocketEvents[Event]
   ): void {
     if (this.handlers[event].length === 0) {
-      this.queues[event].push(args);
+      if (!unqueued.has(event)) {
+        this.queues[event].push(args);
+      }
       return;
     }
     for (const handler of this.handlers[event]) {
@@ -107,6 +130,19 @@ class YedraWebSocket {
    */
   public send(message: Uint8Array<ArrayBufferLike> | string) {
     this.ws.send(message);
+  }
+
+  /**
+   * Send a ping frame. The client answers with a pong carrying the same
+   * payload, which arrives as a `pong` event — so a ping that goes unanswered
+   * for too long means the connection is dead, even if TCP has not noticed.
+   * Browsers answer pings on their own; page scripts never see them.
+   * Pinging a socket that has already closed does nothing, so a heartbeat timer
+   * that outlives the connection is harmless.
+   * @param data - An optional payload of at most 125 bytes, echoed in the pong.
+   */
+  public ping(data?: Uint8Array<ArrayBufferLike> | string) {
+    this.ws.ping(data);
   }
 
   /**

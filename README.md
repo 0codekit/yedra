@@ -348,6 +348,36 @@ larger than `maxPayload`; the socket is closing by then, so `close` follows. You
 can also use the `ws` object to send messages using `send`, or to close the
 connection using `close`.
 
+### Pinging
+
+A connection whose other end vanished — a laptop lid closed, a phone off the
+network — can look open for a long time, because TCP only notices once it tries
+to send. Ping the client to find out: it answers with a pong carrying the same
+payload, and a socket that stops answering is dead.
+
+```ts
+do(ws) {
+  let alive = true;
+  ws.on("pong", () => {
+    alive = true;
+  });
+  const heartbeat = setInterval(() => {
+    if (!alive) {
+      ws.close(1001, "Ping Timeout");
+      return;
+    }
+    alive = false;
+    ws.ping();
+  }, 30_000);
+  ws.on("close", () => clearInterval(heartbeat));
+}
+```
+
+Browsers answer pings on their own, so nothing is needed on the client. Pings
+the client sends are answered automatically too; subscribe to `ping` only to
+observe them. Unlike the other events, `ping` and `pong` are not queued: one
+that arrives before a handler exists is dropped, since it is stale by then.
+
 ### WebSocket Security
 
 WebSockets are not covered by the same-origin policy: a page on any site can

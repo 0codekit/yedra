@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { WebSocket as NodeWebSocket } from 'ws';
 import { string } from '../lib.js';
 import { Yedra } from './app.js';
 import { Ws } from './websocket.js';
@@ -109,5 +110,113 @@ test('events that arrive before a handler is registered are not lost', async () 
   ws.close();
   await done;
   expect(seen).toEqual(['message:hello', 'close']);
+  await context.stop();
+});
+
+test('the server can ping the client and hear its pong', async () => {
+  let pong: (data: string) => void = () => {};
+  const ponged = new Promise<string>((resolve) => {
+    pong = resolve;
+  });
+  const context = await new Yedra()
+    .use(
+      '/ping',
+      new Ws({
+        category: 'Test',
+        summary: 'Pings the client.',
+        params: {},
+        query: {},
+        headers: {},
+        do(socket) {
+          socket.on('pong', (data) => pong(data.toString('utf-8')));
+          socket.ping('heartbeat');
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  // Node's built-in client answers pings itself, like a browser does.
+  const ws = new WebSocket(`http://localhost:${context.port}/ping`);
+  expect(await ponged).toBe('heartbeat');
+  ws.close();
+  await context.stop();
+});
+
+test('the client can ping the server', async () => {
+  let ping: (data: string) => void = () => {};
+  const pinged = new Promise<string>((resolve) => {
+    ping = resolve;
+  });
+  const context = await new Yedra()
+    .use(
+      '/ping',
+      new Ws({
+        category: 'Test',
+        summary: 'Observes pings.',
+        params: {},
+        query: {},
+        headers: {},
+        do(socket) {
+          socket.on('ping', (data) => ping(data.toString('utf-8')));
+          socket.send('ready');
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new NodeWebSocket(`ws://localhost:${context.port}/ping`);
+  await new Promise((resolve) => ws.once('message', resolve));
+  const pong = new Promise<string>((resolve) =>
+    ws.once('pong', (data) => resolve(data.toString('utf-8'))),
+  );
+  ws.ping('are you there');
+  // The server answers on its own; the handler only observes.
+  expect(await pong).toBe('are you there');
+  expect(await pinged).toBe('are you there');
+  ws.close();
+  await context.stop();
+});
+
+test('pings that arrive before a handler exists are dropped, not queued', async () => {
+  const seen: string[] = [];
+  let finished: () => void = () => {};
+  const done = new Promise<void>((resolve) => {
+    finished = resolve;
+  });
+  const context = await new Yedra()
+    .use(
+      '/late-ping',
+      new Ws({
+        category: 'Test',
+        summary: 'Registers its ping handler late.',
+        params: {},
+        query: {},
+        headers: {},
+        async do(socket) {
+          socket.send('ready');
+          await new Promise((resolve) => setTimeout(resolve, 150));
+          socket.on('ping', (data) => {
+            seen.push(data.toString('utf-8'));
+          });
+          socket.on('message', () => finished());
+          socket.send('listening');
+        },
+      }),
+    )
+    .listen(0, { quiet: true });
+  const ws = new NodeWebSocket(`ws://localhost:${context.port}/late-ping`);
+  const messages: string[] = [];
+  const listening = new Promise<void>((resolve) =>
+    ws.on('message', (data: Buffer) => {
+      messages.push(data.toString('utf-8'));
+      if (messages.includes('listening')) resolve();
+    }),
+  );
+  await new Promise((resolve) => ws.once('open', resolve));
+  ws.ping('early');
+  await listening;
+  ws.ping('late');
+  ws.send('done');
+  await done;
+  expect(seen).toEqual(['late']);
+  ws.close();
   await context.stop();
 });

@@ -8,7 +8,35 @@ While yedra is below 1.0.0, breaking changes may land in minor releases.
 
 ## [Unreleased]
 
+## [0.21.5] - 2026-11-20
+
 ### Added
+
+- **WebSocket pinging**: `ws.ping(data?)` sends a ping frame, and `ws.on('pong')`
+  and `ws.on('ping')` report the frames the client sends. Until now an endpoint
+  had no way to tell a quiet connection from a dead one — a client that vanished
+  without closing stayed "open" until TCP gave up, holding whatever the handler
+  had allocated for it.
+
+  ```typescript
+  do(ws) {
+    let alive = true;
+    ws.on('pong', () => {
+      alive = true;
+    });
+    const heartbeat = setInterval(() => {
+      if (!alive) return ws.close(1001, 'Ping Timeout');
+      alive = false;
+      ws.ping();
+    }, 30_000);
+    ws.on('close', () => clearInterval(heartbeat));
+  }
+  ```
+
+  Unlike `message`, `close` and `error`, these events are not queued before a
+  handler is registered. A stale pong says nothing, and a client may ping
+  without limit, so queueing them for an endpoint that never listens would let
+  any client grow the server's memory.
 
 - **`req.socketAddress` on every endpoint**, the IP address the request arrived
   from. Until now an application had no way to learn who was calling it — rate
@@ -703,5 +731,7 @@ behaviour without a compile error. Anything generating clients from
 - The `onmessage` and `onclose` setters on `YedraWebSocket`, replaced by `on`.
 - The `uuid` runtime dependency.
 
+[Unreleased]: https://github.com/0codekit/yedra/compare/v0.21.5...HEAD
+[0.21.5]: https://github.com/0codekit/yedra/releases/tag/v0.21.5
 [0.21.1]: https://github.com/0codekit/yedra/releases/tag/v0.21.1
 [0.21.0]: https://github.com/0codekit/yedra/releases/tag/v0.21.0
